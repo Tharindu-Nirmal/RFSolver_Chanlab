@@ -1,0 +1,6 @@
+checkpoints/
+data/
+testdata/
+results/
+hf/
+**/__pycache__/
