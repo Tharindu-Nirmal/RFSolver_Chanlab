@@ -245,11 +245,22 @@ class SingleStreamBlock(nn.Module):
 
         # Save the features in the memory
         if info['inject'] and info['id'] > 19:
-            feature_name = str(info['t']) + '_' + str(info['second_order']) + '_' + str(info['id']) + '_' + info['type'] + '_' + 'V'
+            # feature_name = str(info['t']) + '_' + str(info['second_order']) + '_' + str(info['id']) + '_' + info['type'] + '_' + 'V'
+            # if info['inverse']:
+            #     info['feature'][feature_name] = v.cpu()
+            # else:
+            #     v = info['feature'][feature_name].cuda()
+            q_feature_name = f"{info['t']}_{info['second_order']}_{info['id']}_{info['type']}_Q"
+            k_feature_name = f"{info['t']}_{info['second_order']}_{info['id']}_{info['type']}_K"
+    
             if info['inverse']:
-                info['feature'][feature_name] = v.cpu()
+                # Save Q and K tensors
+                info['feature'][q_feature_name] = q.cpu()
+                info['feature'][k_feature_name] = k.cpu()
             else:
-                v = info['feature'][feature_name].cuda()
+                # Load Q and K tensors
+                q = info['feature'][q_feature_name].cuda()
+                k = info['feature'][k_feature_name].cuda()
 
         # compute attention
         attn = attention(q, k, v, pe=pe)
