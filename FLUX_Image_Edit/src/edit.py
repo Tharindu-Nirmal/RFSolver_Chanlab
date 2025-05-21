@@ -126,11 +126,14 @@ def main(
 
     while opts is not None:
         if opts.seed is None:
-            opts.seed = rng.seed()
+            opts.seed = torch.randint(0, 2**32 - 1, (1,)).item()  # Generate a random seed
+            torch.manual_seed(opts.seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(opts.seed)
         print(f"Generating with seed {opts.seed}:\n{opts.source_prompt}")
         t0 = time.perf_counter()
 
-        opts.seed = None
+        # opts.seed = None
         if offload:
             ae = ae.cpu()
             torch.cuda.empty_cache()
