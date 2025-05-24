@@ -176,7 +176,7 @@ def main(
 
         for x in batch_x:
             x = x.unsqueeze(0)
-            output_name = os.path.join(output_dir, "img_{idx}_qk.jpg")
+            output_name = os.path.join(output_dir, "img_qk_{idx}.jpg")
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
                 idx = 0
