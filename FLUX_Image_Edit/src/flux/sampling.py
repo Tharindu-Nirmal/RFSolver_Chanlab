@@ -104,6 +104,7 @@ def denoise(
         info['second_order'] = False
         info['inject'] = inject_list[i]
 
+        #vhat_(ti) in algorithm 1 of the paper
         pred, info = model(
             img=img,
             img_ids=img_ids,
@@ -115,10 +116,13 @@ def denoise(
             info=info
         )
 
+        #Z_(ti + delta ti)
         img_mid = img + (t_prev - t_curr) / 2 * pred
 
         t_vec_mid = torch.full((img.shape[0],), (t_curr + (t_prev - t_curr) / 2), dtype=img.dtype, device=img.device)
         info['second_order'] = True
+
+        #vhat_(ti + delta ti) in algorithm 1 of the paper
         pred_mid, info = model(
             img=img_mid,
             img_ids=img_ids,
@@ -130,7 +134,10 @@ def denoise(
             info=info
         )
 
+        #Calculating acceleration (the derivate of velocity).
         first_order = (pred_mid - pred) / ((t_prev - t_curr) / 2)
+
+        #Second order update for the Latent.
         img = img + (t_prev - t_curr) * pred + 0.5 * (t_prev - t_curr) ** 2 * first_order
 
     return img, info
