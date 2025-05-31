@@ -6,8 +6,8 @@ import torchvision.transforms.functional as TF
 
 # ------------- User Settings -------------------
 data_folder = "/scratch/gilbreth/lwickrem/data/HandpickedDegrads/gt"       # Your input image folder
-output_folder = "/scratch/gilbreth/lwickrem/data/HandpickedDegrads/old_photo" # Where degraded images will be saved
-IR_mode = "old photo restoration"  # Select degradation mode
+output_folder = "/scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres" # Where degraded images will be saved
+IR_mode = "super resolution"  # Select degradation mode
 scale = 4                  # Used for super resolution
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # -----------------------------------------------
@@ -37,8 +37,10 @@ def set_operator(IR_mode, img_shape):
         return lambda z: z * mask
 
     elif IR_mode == "super resolution":
-        A = torch.nn.AdaptiveAvgPool2d((h // scale, w // scale))
-        return lambda z: A(z)
+        down = torch.nn.AdaptiveAvgPool2d((h // scale, w // scale))
+        #maintain input image size
+        up = torch.nn.Upsample(size=(h, w), mode="bilinear", align_corners=False)
+        return lambda z: up(down(z))
 
     elif IR_mode == "old photo restoration":
         mask = torch.ones(img_shape, device=device)

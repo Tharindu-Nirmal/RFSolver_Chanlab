@@ -176,12 +176,12 @@ def main(
 
         for x in batch_x:
             x = x.unsqueeze(0)
-            output_name = os.path.join(output_dir, "img_qk_{idx}.jpg")
+            output_name = os.path.join(output_dir, "img_v_{idx}.jpg")
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
                 idx = 0
             else:
-                fns = [fn for fn in iglob(output_name.format(idx="*")) if re.search(r"img_qk_[0-9]+\.jpg$", fn)]
+                fns = [fn for fn in iglob(output_name.format(idx="*")) if re.search(r"img_v_[0-9]+\.jpg$", fn)]
                 if len(fns) > 0:
                     idx = max(int(fn.split("_")[-1].split(".")[0]) for fn in fns) + 1
                 else:
