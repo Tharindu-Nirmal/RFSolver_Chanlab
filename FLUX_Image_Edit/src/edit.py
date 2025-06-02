@@ -17,6 +17,11 @@ from PIL import Image
 import numpy as np
 
 import os
+import json
+
+### Qwen prompter:
+from auto_guide import PromptEditor, DESCRIPTION_PROMPT, OBJECTIVE
+from datetime import datetime
 
 NSFW_THRESHOLD = 0.85
 
@@ -174,9 +179,12 @@ def main(
         # decode latents to pixel space
         batch_x = unpack(x.float(), opts.width, opts.height)
 
+        current_datetime = datetime.now().strftime("%Y%m%d%H%M%S")
+
         for x in batch_x:
             x = x.unsqueeze(0)
-            output_name = os.path.join(output_dir, "img_{idx}.jpg")
+            output_name = os.path.join(output_dir, f"img_{current_datetime}_{{idx}}.jpg")
+            tracker.results.append({output_name: vars(args)})
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
                 idx = 0
@@ -222,6 +230,39 @@ def main(
             else:
                 opts = None
 
+                
+class ResultsTracker:
+    def __init__(self, storage_path):
+        self.storage_path = storage_path
+        self.results = []
+        self.load()
+        
+    def load(self):
+        if os.path.exists(self.storage_path):
+            with open(self.storage_path, 'r') as f:
+                self.results = json.load(f)
+        else:
+            self.results = []
+        
+    def save(self):
+        with open(self.storage_path, 'w') as f:
+            json.dump(self.results, f)
+            
+tracker = ResultsTracker("results.json")
+
+# Example run:
+'''
+python edit.py  --source_prompt qwen \
+                --target_prompt qwen \
+                --guidance 5 \
+                --source_img_dir ./test_pic.png \
+                --num_steps 30  \
+                --inject 3 \
+                --name 'flux-dev' --offload \
+                --output_dir ./output 
+'''
+
+
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='RF-Edit')
@@ -247,5 +288,18 @@ if __name__ == "__main__":
     parser.add_argument('--offload', action='store_true', help='set it to True if the memory of GPU is not enough')
 
     args = parser.parse_args()
+    
+    if args.source_prompt == "qwen" or args.target_prompt == "qwen":
+        editor = PromptEditor()
+        pil_img = Image.open(args.source_img_dir).convert("RGB")
+    
+        image_description = editor.generate(pil_img, DESCRIPTION_PROMPT)
+        edited_description = editor.edit(image_description, OBJECTIVE)
+        
+        if args.source_prompt == "qwen":
+            args.source_prompt = image_description
+        if args.target_prompt == "qwen":
+            args.target_prompt = edited_description
 
     main(args)
+    tracker.save()

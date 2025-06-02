@@ -5,4 +5,5 @@ results/
 hf/
 **/__pycache__/
 __pycache__/
+*.egg-info/
 *.pyc
