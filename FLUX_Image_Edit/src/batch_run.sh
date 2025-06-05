@@ -6,12 +6,18 @@ COMMON_ARGS="--num_steps 30 --name 'flux-dev' --offload"
 
 # Define runs as individual strings (no line breaks inside array entries)
 runs=(
-"--source_prompt \"low resolution image\" --target_prompt \"high resolution image\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
-"--source_prompt \"low resolution image\" --target_prompt \"high resolution image\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/130014.jpg"
-"--source_prompt \"low resolution image\" --target_prompt \"high resolution image\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/134049.jpg"
-"--source_prompt \"low resolution image\" --target_prompt \"high resolution image\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/22.png"
-"--source_prompt \"low resolution image\" --target_prompt \"high resolution image\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/58_rain.png"
-"--source_prompt \"low resolution image\" --target_prompt \"high resolution image\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/city_read_03728.jpg"
+"--source_prompt \"A low resolution image\" --target_prompt \"A high resolution image.\" --guidance 2 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
+"--source_prompt \"A low resolution image\" --target_prompt \"A high resolution image.\" --guidance 4 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
+"--source_prompt \"A low resolution image\" --target_prompt \"A high resolution image.\" --guidance 6 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
+"--source_prompt \"A low resolution image\" --target_prompt \"A high resolution image of two parked cars near a walkway. The image is sharp and deblurred.\" --guidance 2 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
+"--source_prompt \"A low resolution image\" --target_prompt \"A high resolution image of two parked cars near a walkway. The image is sharp and deblurred.\" --guidance 4 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
+"--source_prompt \"A low resolution image of two parked cars near a walkway.\" --target_prompt \"A high resolution image of two parked cars near a walkway. The image is sharp and deblurred.\" --guidance 2 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
+# "--source_prompt \"low resolution image\" --target_prompt \"A high resolution image.\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/130014.jpg"
+# "--source_prompt \"low resolution image\" --target_prompt \"A high resolution image.\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/134049.jpg"
+# "--source_prompt \"low resolution image\" --target_prompt \"A high resolution image.\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/22.png"
+# "--source_prompt \"low resolution image\" --target_prompt \"A high resolution image.\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/573.png"
+# "--source_prompt \"low resolution image\" --target_prompt \"A high resolution image.\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/58_rain.png"
+# "--source_prompt \"low resolution image\" --target_prompt \"A high resolution image.\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/city_read_03728.jpg"
 )
 
 # runs=(
@@ -24,7 +30,7 @@ runs=(
 # )
 
 # Output directory base
-OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/ddnm_superres_degrad_RFEdited"
+OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Avgblur_RFedit_ddnmsimple"
 
 # Run each experiment
 for i in "${!runs[@]}"; do

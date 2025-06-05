@@ -8,6 +8,8 @@ from torch import Tensor
 from .model import Flux
 from .modules.conditioner import HFEmbedder
 
+from .ddnm_degrads import ddnm_simple
+
 
 def prepare(t5: HFEmbedder, clip: HFEmbedder, img: Tensor, prompt: str | list[str]) -> dict[str, Tensor]:
     bs, c, h, w = img.shape
@@ -84,9 +86,13 @@ def denoise(
     vec: Tensor,
     # sampling parameters
     timesteps: list[float],
+    y: Tensor,
+    width,
+    height,
     inverse,
-    info, 
-    guidance: float = 4.0
+    info,
+    guidance: float = 4.0, 
+    
 ):
     # this is ignored for schnell
     inject_list = [True] * info['inject_step'] + [False] * (len(timesteps[:-1]) - info['inject_step'])
@@ -139,6 +145,20 @@ def denoise(
 
         #Second order update for the Latent.
         img = img + (t_prev - t_curr) * pred + 0.5 * (t_prev - t_curr) ** 2 * first_order
+
+        #ddnm update
+        # print('i=',i)
+        # print('img shape:',img.shape, 'y_shape:', y.shape)
+        img = rearrange(img, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=math.ceil(height / 16), w=math.ceil(width / 16), ph=2, pw=2,)
+        
+        # confirming the shape of the input degraded image (y= A img) is the measured version of the image (img).
+        # print('img shape:',img.shape, 'y_shape:', y.shape)
+
+        # Using 4x downsample for y
+        img = ddnm_simple(img, y, lambda_t=1, IR_mode="super resolution embeds")
+        img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
+
+
 
     return img, info
 

@@ -107,8 +107,24 @@ def main(
 
     init_image = init_image[:new_h, :new_w, :]
 
-    width, height = init_image.shape[0], init_image.shape[1]
+    # The assignment was mixed up in the original code, so I flipped width and height
+    height, width = init_image.shape[0], init_image.shape[1]
+    # print('init_image shape:',init_image.shape) # [720,1280,3]
+
+    #encode the image into latent space
     init_image = encode(init_image, torch_device, ae)
+
+    #====Creating an encoded y tensor to repeatedly be used in sampling.py-->ddnm_simple
+    y_enc = init_image # [1, 16, 90, 160]
+    scale_h = 2
+    scale_w = 8
+    B,C,H,W = y_enc.shape
+    assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
+    y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
+    y_enc = y_enc.mean(dim=(-1, -2))
+
+    # print('y_enc shape:',y_enc.shape) # [1, 16, 45, 20]
+    #=====
 
     rng = torch.Generator(device="cpu")
     opts = SamplingOptions(
@@ -146,7 +162,9 @@ def main(
         if not os.path.exists(args.feature_path):
             os.mkdir(args.feature_path)
 
+        # prepare the input tensors for the VIT model by patching and changing shape
         inp = prepare(t5, clip, init_image, prompt=opts.source_prompt)
+        
         inp_target = prepare(t5, clip, init_image, prompt=opts.target_prompt)
         timesteps = get_schedule(opts.num_steps, inp["img"].shape[1], shift=(name != "flux-schnell"))
 
@@ -156,32 +174,33 @@ def main(
             torch.cuda.empty_cache()
             model = model.to(torch_device)
 
-        # inversion initial noise
-        z, info = denoise(model, **inp, timesteps=timesteps, guidance=1, inverse=True, info=info)
+        # inversion to go from image latent to initial noise latent
+        z, info = denoise(model, **inp, timesteps=timesteps, y=y_enc, width=width, height=height, guidance=1, inverse=True, info=info)
         
         inp_target["img"] = z
 
         timesteps = get_schedule(opts.num_steps, inp_target["img"].shape[1], shift=(name != "flux-schnell"))
 
         # denoise initial noise
-        x, _ = denoise(model, **inp_target, timesteps=timesteps, guidance=guidance, inverse=False, info=info)
+        x, _ = denoise(model, **inp_target, timesteps=timesteps, y=y_enc, width=opts.width, height=opts.height, guidance=guidance, inverse=False, info=info)
         
         if offload:
             model.cpu()
             torch.cuda.empty_cache()
             ae.decoder.to(x.device)
 
-        # decode latents to pixel space
-        batch_x = unpack(x.float(), opts.width, opts.height)
+        # Decode latents to pixel space.  
+        # Look at the unpack function in flux/sampling.py. Previously they had switched width and height for some reason.
+        batch_x = unpack(x.float(), opts.height, opts.width)
 
         for x in batch_x:
             x = x.unsqueeze(0)
-            output_name = os.path.join(output_dir, "img_v_{idx}.jpg")
+            output_name = os.path.join(output_dir, "imgwddnm_v_{idx}.jpg")
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
                 idx = 0
             else:
-                fns = [fn for fn in iglob(output_name.format(idx="*")) if re.search(r"img_v_[0-9]+\.jpg$", fn)]
+                fns = [fn for fn in iglob(output_name.format(idx="*")) if re.search(r"imgwddnm_v_[0-9]+\.jpg$", fn)]
                 if len(fns) > 0:
                     idx = max(int(fn.split("_")[-1].split(".")[0]) for fn in fns) + 1
                 else:
