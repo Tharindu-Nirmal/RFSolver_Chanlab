@@ -9,8 +9,8 @@ data_folder = "/scratch/gilbreth/lwickrem/data/HandpickedDegrads/gt"       # You
 output_folder = "/scratch/gilbreth/lwickrem/data/HandpickedDegrads/" # Where degraded images will be saved
 IR_mode = "super resolution"  # Select degradation mode
 scale = 4                  # Used for super resolution
-scale_h = 2
-scale_w = 8
+scale_h = 4
+scale_w = 4
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # -----------------------------------------------
 

@@ -110,6 +110,10 @@ class Flux(nn.Module):
         for block in self.single_blocks:
             info['id'] = cnt
             img, info = block(img, vec=vec, pe=pe, info=info)
+
+            # Need some debugginh to understand the shape and content of img
+            # print("img shape:", img.shape)
+
             cnt += 1
 
         img = img[:, txt.shape[1] :, ...]

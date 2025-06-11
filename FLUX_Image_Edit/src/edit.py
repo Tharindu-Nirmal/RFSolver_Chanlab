@@ -116,8 +116,12 @@ def main(
 
     #====Creating an encoded y tensor to repeatedly be used in sampling.py-->ddnm_simple
     y_enc = init_image # [1, 16, 90, 160]
-    scale_h = 2
-    scale_w = 8
+    print('y_enc shape:',y_enc.shape) # 
+    scale_h = 4
+    scale_w = 4
+    if height >= width:
+        scale_h,scale_w = scale_w,scale_h # swap if height is greater than width
+    
     B,C,H,W = y_enc.shape
     assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
     y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
@@ -159,6 +163,7 @@ def main(
         info['feature_path'] = args.feature_path
         info['feature'] = {}
         info['inject_step'] = args.inject
+        info['ddnm_step'] = args.ddnm_inject
         if not os.path.exists(args.feature_path):
             os.mkdir(args.feature_path)
 
@@ -261,6 +266,8 @@ if __name__ == "__main__":
                         help='the number of timesteps for inversion and denoising')
     parser.add_argument('--inject', type=int, default=20,
                         help='the number of timesteps which apply the feature sharing')
+    parser.add_argument('--ddnm_inject', type=int, default=20,
+                        help='the number of timesteps which apply the ddnm update')
     parser.add_argument('--output_dir', default='output', type=str,
                         help='the path of the edited image')
     parser.add_argument('--offload', action='store_true', help='set it to True if the memory of GPU is not enough')

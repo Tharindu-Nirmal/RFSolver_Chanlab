@@ -96,10 +96,12 @@ def denoise(
 ):
     # this is ignored for schnell
     inject_list = [True] * info['inject_step'] + [False] * (len(timesteps[:-1]) - info['inject_step'])
+    ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
 
     if inverse:
         timesteps = timesteps[::-1]
         inject_list = inject_list[::-1]
+        ddnm_list = ddnm_list[::-1]
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
     step_list = []
@@ -109,6 +111,7 @@ def denoise(
         info['inverse'] = inverse
         info['second_order'] = False
         info['inject'] = inject_list[i]
+        info['ddnm'] = ddnm_list[i]
 
         #vhat_(ti) in algorithm 1 of the paper
         pred, info = model(
@@ -149,16 +152,15 @@ def denoise(
         #ddnm update
         # print('i=',i)
         # print('img shape:',img.shape, 'y_shape:', y.shape)
-        img = rearrange(img, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=math.ceil(height / 16), w=math.ceil(width / 16), ph=2, pw=2,)
-        
-        # confirming the shape of the input degraded image (y= A img) is the measured version of the image (img).
-        # print('img shape:',img.shape, 'y_shape:', y.shape)
+        if info['inject']:
+            img = rearrange(img, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=math.ceil(height / 16), w=math.ceil(width / 16), ph=2, pw=2,)
+            
+            # confirming the shape of the input degraded image (y= A img) is the measured version of the image (img).
+            # print('img shape:',img.shape, 'y_shape:', y.shape)
 
-        # Using 4x downsample for y
-        img = ddnm_simple(img, y, lambda_t=1, IR_mode="super resolution embeds")
-        img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
-
-
+            # Using 4x downsample for y
+            img = ddnm_simple(img, y, lambda_t=0.01, IR_mode="super resolution embeds")
+            img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
 
     return img, info
 
