@@ -152,7 +152,7 @@ def denoise(
         #ddnm update
         # print('i=',i)
         # print('img shape:',img.shape, 'y_shape:', y.shape)
-        if info['inject']:
+        if info['ddnm']:
             img = rearrange(img, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=math.ceil(height / 16), w=math.ceil(width / 16), ph=2, pw=2,)
             
             # confirming the shape of the input degraded image (y= A img) is the measured version of the image (img).
