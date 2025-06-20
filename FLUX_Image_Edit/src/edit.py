@@ -109,26 +109,44 @@ def main(
 
     # The assignment was mixed up in the original code, so I flipped width and height
     height, width = init_image.shape[0], init_image.shape[1]
-    # print('init_image shape:',init_image.shape) # [720,1280,3]
 
-    #encode the image into latent space
-    init_image = encode(init_image, torch_device, ae)
-
-    #====Creating an encoded y tensor to repeatedly be used in sampling.py-->ddnm_simple
-    y_enc = init_image # [1, 16, 90, 160]
-    print('y_enc shape:',y_enc.shape) # 
+    #====================edits start==============
+    # Scales for average pooling
+    print('init_image shape:',init_image.shape) # [320,480,3]
     scale_h = 4
     scale_w = 4
     if height >= width:
         scale_h,scale_w = scale_w,scale_h # swap if height is greater than width
-    
+
+    #Creating y tensor to repeatedly be used in sampling.py-->ddnm_simple
+    y = torch.from_numpy(init_image).float().unsqueeze(0) # [1,320,480,3]
+    B,H,W,C = y.shape
+    assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
+
+    y = rearrange(y, 'b (h s1) (w s2) c-> b c h w s1 s2', s1=scale_h, s2=scale_w)
+    # y = y / 127.5 - 1
+    y = y.mean(dim=(-1, -2))  # [1, 3, 80, 120]
+    y = y.to(torch_device)
+    print('y shape:', y.shape)
+    print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
+
+    #Convert the numpy image array into latent space tensor. init_image is used both in inversion and reconstruction
+    init_image = encode(init_image, torch_device, ae) # 
+
+    #Creating a copy y_enc tensor to repeatedly be used in inversion. sampling.py-->ddnm_simple
+    y_enc = init_image # [1, 16, 40, 60]
     B,C,H,W = y_enc.shape
     assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
-    y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
-    y_enc = y_enc.mean(dim=(-1, -2))
 
-    # print('y_enc shape:',y_enc.shape) # [1, 16, 45, 20]
-    #=====
+    #Average pooling
+    y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
+    y_enc = y_enc.mean(dim=(-1, -2))  # [1, 16, 10, 15]
+    #didnt rescale the image, or move y_enc to torch_deivce, because enode already does it.
+    print('y_enc shape:', y_enc.shape)
+    print(f"y_enc Tensor range: min={y_enc.min().item():.4f}, max={y_enc.max().item():.4f}")
+    
+
+    #=======================edits end===============
 
     rng = torch.Generator(device="cpu")
     opts = SamplingOptions(
@@ -180,14 +198,14 @@ def main(
             model = model.to(torch_device)
 
         # inversion to go from image latent to initial noise latent
-        z, info = denoise(model, **inp, timesteps=timesteps, y=y_enc, width=width, height=height, guidance=1, inverse=True, info=info)
+        z, info = denoise(model, **inp, timesteps=timesteps, y_enc=y_enc, y=y, width=width, height=height, guidance=1, inverse=True, info=info)
         
         inp_target["img"] = z
 
         timesteps = get_schedule(opts.num_steps, inp_target["img"].shape[1], shift=(name != "flux-schnell"))
 
         # denoise initial noise
-        x, _ = denoise(model, **inp_target, timesteps=timesteps, y=y_enc, width=opts.width, height=opts.height, guidance=guidance, inverse=False, info=info)
+        x, _ = denoise(model, **inp_target, timesteps=timesteps, y_enc=y_enc, y=y, width=opts.width, height=opts.height, guidance=guidance, inverse=False, info=info)
         
         if offload:
             model.cpu()
@@ -266,7 +284,7 @@ if __name__ == "__main__":
                         help='the number of timesteps for inversion and denoising')
     parser.add_argument('--inject', type=int, default=20,
                         help='the number of timesteps which apply the feature sharing')
-    parser.add_argument('--ddnm_inject', type=int, default=20,
+    parser.add_argument('--ddnm_inject', type=int, default=2,
                         help='the number of timesteps which apply the ddnm update')
     parser.add_argument('--output_dir', default='output', type=str,
                         help='the path of the edited image')

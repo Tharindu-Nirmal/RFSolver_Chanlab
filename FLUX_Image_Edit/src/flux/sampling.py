@@ -9,6 +9,7 @@ from .model import Flux
 from .modules.conditioner import HFEmbedder
 
 from .ddnm_degrads import ddnm_simple
+from .util import (load_ae)
 
 
 def prepare(t5: HFEmbedder, clip: HFEmbedder, img: Tensor, prompt: str | list[str]) -> dict[str, Tensor]:
@@ -76,6 +77,17 @@ def get_schedule(
     return timesteps.tolist()
 
 
+# Reorder the function definition to be used in denoise.
+def unpack(x: Tensor, height: int, width: int) -> Tensor:
+    return rearrange(
+        x,
+        "b (h w) (c ph pw) -> b c (h ph) (w pw)",
+        h=math.ceil(height / 16),
+        w=math.ceil(width / 16),
+        ph=2,
+        pw=2,
+    )
+
 def denoise(
     model: Flux,
     # model input
@@ -86,18 +98,27 @@ def denoise(
     vec: Tensor,
     # sampling parameters
     timesteps: list[float],
+    y_enc: Tensor,
     y: Tensor,
     width,
     height,
     inverse,
     info,
-    guidance: float = 4.0, 
+    name: str = "flux-dev",
+    offload: bool = False,
+    guidance: float = 4.0,
+    device: str = "cuda" if torch.cuda.is_available() else "cpu", 
     
 ):
     # this is ignored for schnell
     inject_list = [True] * info['inject_step'] + [False] * (len(timesteps[:-1]) - info['inject_step'])
-    ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
 
+    #edits for ddnm update
+    ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
+    torch_device = torch.device(device)
+    ae = load_ae(name, device="cpu" if offload else torch_device)
+    
+    
     if inverse:
         timesteps = timesteps[::-1]
         inject_list = inject_list[::-1]
@@ -149,28 +170,37 @@ def denoise(
         #Second order update for the Latent.
         img = img + (t_prev - t_curr) * pred + 0.5 * (t_prev - t_curr) ** 2 * first_order
 
-        #ddnm update
-        # print('i=',i)
-        # print('img shape:',img.shape, 'y_shape:', y.shape)
-        if info['ddnm']:
-            img = rearrange(img, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=math.ceil(height / 16), w=math.ceil(width / 16), ph=2, pw=2,)
+        #ddnm update in latent space
+        # if info['ddnm']:
+        #     img = rearrange(img, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=math.ceil(height / 16), w=math.ceil(width / 16), ph=2, pw=2,)
             
-            # confirming the shape of the input degraded image (y= A img) is the measured version of the image (img).
-            # print('img shape:',img.shape, 'y_shape:', y.shape)
+        #     # confirming the shape of the input degraded image (y= A img) is the measured version of the image (img).
+        #     # print('img shape:',img.shape, 'y_shape:', y.shape)
 
-            # Using 4x downsample for y
-            img = ddnm_simple(img, y, lambda_t=0.01, IR_mode="super resolution embeds")
+        #     # Using 4x downsample for y
+        #     print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
+        #     img = ddnm_simple(img, y_enc, lambda_t=0.01, IR_mode="super resolution embeds")
+        #     img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
+
+        # NEED ALOT OF DEBUGGING HERE. y should be in image space. ==================================================
+        #ddnm update in image space
+        if info['ddnm']:
+            # decode
+            img = unpack(img, height, width) #[B,C,H,W]
+            with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
+                img = ae.decode(img)
+
+            print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
+            img = ddnm_simple(img, y, lambda_t=0.01, IR_mode="super resolution") # both y and img are in [B,C,H,W]
+
+            # The only relevant part from the encode() function
+            img = ae.encode(img.to()).to(torch.bfloat16)
+            print("encoded img shape:", img.shape)
+
+            # The only relevant part in the prepare() function
             img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
 
     return img, info
 
 
-def unpack(x: Tensor, height: int, width: int) -> Tensor:
-    return rearrange(
-        x,
-        "b (h w) (c ph pw) -> b c (h ph) (w pw)",
-        h=math.ceil(height / 16),
-        w=math.ceil(width / 16),
-        ph=2,
-        pw=2,
-    )
+

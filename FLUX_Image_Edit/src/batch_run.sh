@@ -6,7 +6,7 @@ COMMON_ARGS="--num_steps 30 --name 'flux-dev' --offload"
 
 # Define runs as individual strings (no line breaks inside array entries)
 runs=(
-"--source_prompt \"A low resolution image of a leopard\" --target_prompt \"A high resolution image of a leopard.\" --guidance 6 --inject 6 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/134049.jpg"
+"--source_prompt \"A low resolution image of a leopard\" --target_prompt \"A high resolution image of a leopard.\" --guidance 2 --inject 8 --ddnm_inject 1 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/134049.jpg"
 
 # "--source_prompt \"A low resolution image\" --target_prompt \"A high resolution image.\" --guidance 4 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
 # "--source_prompt \"A low resolution image\" --target_prompt \"A high resolution image.\" --guidance 6 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
@@ -32,7 +32,7 @@ runs=(
 # )
 
 # Output directory base
-OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Avgblur_RFedit_ddnmsimple"
+OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Avgblur_RFedit_ddnm_trials"
 
 # Run each experiment
 for i in "${!runs[@]}"; do
