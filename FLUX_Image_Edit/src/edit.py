@@ -106,43 +106,45 @@ def main(
     new_w = shape[1] if shape[1] % 16 == 0 else shape[1] - shape[1] % 16
 
     init_image = init_image[:new_h, :new_w, :]
-    h, w, c = init_image.shape
+
+    # Will be passed on as options(opts) in the sampling.py script.
+    height, width, c = init_image.shape
 
     #====================edits start==============
     # Scales for average pooling
     print('init_image shape:',init_image.shape) # [320,480,3]
     scale_h = 4
     scale_w = 4
-    if h >= w:
+    if height >= width:
         scale_h,scale_w = scale_w,scale_h # swap if height is greater than width
 
     #Creating y tensor to repeatedly be used in sampling.py-->ddnm_simple
     y = torch.from_numpy(init_image).float().unsqueeze(0) / 127.5 - 1 # [1,320,480,3] and normalise as done in encode()
-    y = rearrange(y, 'b h w c-> b c h w') # [1,3,320,480]
+    B,H,W,C = y.shape
+    assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
+
+    y = rearrange(y, 'b (h s1) (w s2) c-> b c h w s1 s2', s1=scale_h, s2=scale_w)
+    y = y.mean(dim=(-1, -2))  # [1, 3, 80, 120]
+
     y = y.to(torch_device)
     print('y shape:', y.shape)
     print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
-
-    #naive upsample the degraded image
-    init_image = np.repeat( np.repeat(init_image, scale_h, axis=0), scale_w, axis=1)
-    height, width = init_image.shape[0], init_image.shape[1]
     
-    print('init_image to flux shape:',init_image.shape) # [4x320,4x480,3]
-
+    print('init_image to flux shape:',init_image.shape) # [320,480,3]
 
     #Convert the numpy image array into latent space tensor. init_image is used both in inversion and reconstruction
-    init_image = encode(init_image, torch_device, ae) # 
+    init_image = encode(init_image, torch_device, ae) # [1, 16, 40, 60]
 
 
     #Creating y_enc: An encoded version of the degraded image in latent space. (Didnt have a big improvement before)
     # used in inversion. sampling.py-->ddnm_simple
-    y_enc = init_image # [1, 16, ?, ?]
+    y_enc = init_image # [1, 16, 40, 60]
     B,C,H,W = y_enc.shape
     assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
 
     #Average pooling
     y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
-    y_enc = y_enc.mean(dim=(-1, -2))  # [1, 16, ?, ?]
+    y_enc = y_enc.mean(dim=(-1, -2))  # [1, 16, 10, 15]
     #didnt rescale the image, or move y_enc to torch_deivce, because enode already does it.
     # print('y_enc shape:', y_enc.shape)
     # print(f"y_enc Tensor range: min={y_enc.min().item():.4f}, max={y_enc.max().item():.4f}")
