@@ -10,6 +10,7 @@ from .modules.conditioner import HFEmbedder
 
 from .ddnm_degrads import ddnm_simple
 from .util import (load_ae)
+from PIL import Image
 
 
 def prepare(t5: HFEmbedder, clip: HFEmbedder, img: Tensor, prompt: str | list[str]) -> dict[str, Tensor]:
@@ -113,8 +114,11 @@ def denoise(
     # this is ignored for schnell
     inject_list = [True] * info['inject_step'] + [False] * (len(timesteps[:-1]) - info['inject_step'])
 
-    #edits for ddnm update
-    ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
+    # edits for ddnm update
+    # ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
+    # ddnm_list = [False] * (len(timesteps[:-1]) - info['ddnm_step']) + [True] * info['ddnm_step']
+    ddnm_list =  [False]*(len(timesteps[:-1]) - 3) + [True]*1 + [False]*2
+
     torch_device = torch.device(device)
     ae = load_ae(name, device="cpu" if offload else torch_device)
     
@@ -189,9 +193,18 @@ def denoise(
             img = unpack(img, height, width) #[B,C,H,W]
             with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
                 img = ae.decode(img)
+            
+            #Save the image as of this point
+            # # bring into PIL format and save
+            x = img.clamp(-1, 1)
+            x = rearrange(x[0], "c h w -> h w c")
+            img_x = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())
+            img_x.save('test.png', quality=95, subsampling=0)
+            # assert 1==0
 
             print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
-            img = ddnm_simple(img, y, lambda_t=0.01, IR_mode="super resolution") # both y and img are in [B,C,H,W]
+            print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
+            img = ddnm_simple(img, y, lambda_t=0.001, IR_mode="super resolution") # both y and img are in [B,C,H,W]
 
             # The only relevant part from the encode() function
             img = ae.encode(img.to()).to(torch.bfloat16)

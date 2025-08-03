@@ -117,7 +117,7 @@ def main(
         scale_h,scale_w = scale_w,scale_h # swap if height is greater than width
 
     #Creating y tensor to repeatedly be used in sampling.py-->ddnm_simple
-    y = torch.from_numpy(init_image).float().unsqueeze(0) # [1,320,480,3]
+    y = torch.from_numpy(init_image).float().unsqueeze(0) / 127.5 - 1 # [1,320,480,3] and normalise as done in encode()
     y = rearrange(y, 'b h w c-> b c h w') # [1,3,320,480]
     y = y.to(torch_device)
     print('y shape:', y.shape)
@@ -133,7 +133,9 @@ def main(
     #Convert the numpy image array into latent space tensor. init_image is used both in inversion and reconstruction
     init_image = encode(init_image, torch_device, ae) # 
 
-    #Creating a copy y_enc tensor to repeatedly be used in inversion. sampling.py-->ddnm_simple
+
+    #Creating y_enc: An encoded version of the degraded image in latent space. (Didnt have a big improvement before)
+    # used in inversion. sampling.py-->ddnm_simple
     y_enc = init_image # [1, 16, ?, ?]
     B,C,H,W = y_enc.shape
     assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
@@ -142,8 +144,8 @@ def main(
     y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
     y_enc = y_enc.mean(dim=(-1, -2))  # [1, 16, ?, ?]
     #didnt rescale the image, or move y_enc to torch_deivce, because enode already does it.
-    print('y_enc shape:', y_enc.shape)
-    print(f"y_enc Tensor range: min={y_enc.min().item():.4f}, max={y_enc.max().item():.4f}")
+    # print('y_enc shape:', y_enc.shape)
+    # print(f"y_enc Tensor range: min={y_enc.min().item():.4f}, max={y_enc.max().item():.4f}")
     
 
     #=======================edits end===============

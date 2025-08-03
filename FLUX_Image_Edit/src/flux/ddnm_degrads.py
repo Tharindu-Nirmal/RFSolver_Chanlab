@@ -119,7 +119,7 @@ def set_pinv_operator(img_shape, IR_mode):
 
 
 # ------------ DDNM pipeline function to be imported to the edit.py script -----------
-def ddnm_simple(x0t, y, lambda_t=1, IR_mode="super resolution embeds"):
+def ddnm_simple(x0t, y, lambda_t=0.1, IR_mode="super resolution embeds"):
 # Refer: https://arxiv.org/pdf/2212.00490
 # https://github.com/wyhuai/DDNM
 
