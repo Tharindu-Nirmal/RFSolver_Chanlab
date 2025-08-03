@@ -75,6 +75,7 @@ def main(
     output_dir = args.output_dir
     num_steps = args.num_steps
     offload = args.offload
+    degradation_type = args.degradation
 
     nsfw_classifier = pipeline("image-classification", model="Falconsai/nsfw_image_detection", device=device)
 
@@ -123,8 +124,13 @@ def main(
     B,H,W,C = y.shape
     assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
 
-    y = rearrange(y, 'b (h s1) (w s2) c-> b c h w s1 s2', s1=scale_h, s2=scale_w)
-    y = y.mean(dim=(-1, -2))  # [1, 3, 80, 120]
+    # If the degradation type by nature downsizes the image, we need to do it. The dataset is assumed to be in the same size as the init_image.
+    if degradation_type == "super resolution":
+        y = rearrange(y, 'b (h s1) (w s2) c-> b c h w s1 s2', s1=scale_h, s2=scale_w)
+        y = y.mean(dim=(-1, -2))  # [1, 3, 80, 120]
+    
+    else:
+        y = rearrange(y, 'b h w c-> b c h w') # [1, 3, 80, 120]
 
     y = y.to(torch_device)
     print('y shape:', y.shape)
@@ -293,6 +299,8 @@ if __name__ == "__main__":
     parser.add_argument('--output_dir', default='output', type=str,
                         help='the path of the edited image')
     parser.add_argument('--offload', action='store_true', help='set it to True if the memory of GPU is not enough')
+    parser.add_argument('--degradation', type=str, default='super resolution',
+                        help='degradation mode: super resolution, colorization, old photo restoration, inpainting')
 
     args = parser.parse_args()
 
