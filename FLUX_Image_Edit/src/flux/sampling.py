@@ -114,15 +114,19 @@ def denoise(
     # this is ignored for schnell
     inject_list = [True] * info['inject_step'] + [False] * (len(timesteps[:-1]) - info['inject_step'])
 
-    # edits for ddnm update
+    # edits for ddnm update: The order here is for going from noise to image.
     # ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
     # ddnm_list = [False] * (len(timesteps[:-1]) - info['ddnm_step']) + [True] * info['ddnm_step']
-    ddnm_list =  [False]*(len(timesteps[:-1]) - 6) + [True]*5 + [False]*1
+    
+    # print('debug',len(timesteps[:-1]))
+    ddnm_list =  [False]*(len(timesteps[:-1]) - 7) + [True]*5 + [False]*2 
+    # print('debug',ddnm_list)
 
     torch_device = torch.device(device)
     ae = load_ae(name, device="cpu" if offload else torch_device)
     
     
+    #"Inverting" in this code is the processing of converting the image into noise.
     if inverse:
         timesteps = timesteps[::-1]
         inject_list = inject_list[::-1]
@@ -186,9 +190,19 @@ def denoise(
         #     img = ddnm_simple(img, y_enc, lambda_t=0.01, IR_mode="super resolution embeds")
         #     img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
 
-        # NEED ALOT OF DEBUGGING HERE. y should be in image space. ==================================================
-        #ddnm update in image space
-        if info['ddnm']:
+        img_debug = unpack(img, height, width) #[B,C,H,W]
+        with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
+            img_debug = ae.decode(img_debug)
+        
+        # Debugging: Save the image as of this point
+        # # bring into PIL format and save
+        x_debug = img_debug.clamp(-1, 1)
+        x_debug = rearrange(x_debug[0], "c h w -> h w c")
+        img_x_debug = Image.fromarray((127.5 * (x_debug + 1.0)).cpu().byte().numpy())
+        img_x_debug.save('test_inverse%s_timestep%d.png'%('img2noise' if inverse else 'noise2img', i), quality=95, subsampling=0)
+
+        #ddnm update in image space. y should be in image space.
+        if (not(inverse) and info['ddnm']):
             # decode
             img = unpack(img, height, width) #[B,C,H,W]
             with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
@@ -199,16 +213,16 @@ def denoise(
             x = img.clamp(-1, 1)
             x = rearrange(x[0], "c h w -> h w c")
             img_x = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())
-            img_x.save('test.png', quality=95, subsampling=0)
+            img_x.save('test_ddnm_timestep%d.png'%(i), quality=95, subsampling=0)
             # assert 1==0
 
-            print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
-            print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
+            # print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
+            # print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
             img = ddnm_simple(img, y, lambda_t=0.01, IR_mode="colorization") # both y and img are in [B,C,H,W]
 
             # The only relevant part from the encode() function
             img = ae.encode(img.to()).to(torch.bfloat16)
-            print("encoded img shape:", img.shape)
+            # print("encoded img shape:", img.shape) #[1,16,40,60]
 
             # The only relevant part in the prepare() function
             img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)

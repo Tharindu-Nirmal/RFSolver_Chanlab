@@ -243,7 +243,8 @@ class SingleStreamBlock(nn.Module):
         #     if not info['inverse']:
         #         v = torch.load(store_path, weights_only=True)
 
-        # Save the features in the memory
+        # Save the features in the memory if inverse. Else(when going from noise to image), load the features from the memory.
+        # There are 38 single blocks in the DiT model. info[id] is the index of the block.
         if info['inject'] and info['id'] > 19:
             feature_name = str(info['t']) + '_' + str(info['second_order']) + '_' + str(info['id']) + '_' + info['type'] + '_' + 'V'
             if info['inverse']:
