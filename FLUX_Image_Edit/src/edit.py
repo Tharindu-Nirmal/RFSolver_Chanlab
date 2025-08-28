@@ -18,6 +18,9 @@ import numpy as np
 
 import os
 
+# Sanity check if "cleaning up" is possible
+from diffusers import StableDiffusionXLImg2ImgPipeline
+
 NSFW_THRESHOLD = 0.85
 
 @dataclass
@@ -254,6 +257,30 @@ def main(
             x = rearrange(x[0], "c h w -> h w c")
 
             img = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy()) #[0,255]
+
+            # Edits start: Use SD to "clean up" the image
+            pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0",torch_dtype=torch.float16,).to(torch_device)
+            pipe.enable_model_cpu_offload()  # memory-friendly; or use .to(device) only
+
+            # flow_output which is in PIL format is sent as input to SD
+            flow_out_pil = img # shape (H,W,3), dtype=uint8
+
+            prompt = "photo-realistic, clean details, sharp edges, natural colors"
+            negative_prompt = "blur, artifacts, oversharpening, waxy skin, banding"
+
+            # SDEdit refinement: strength≈0.2–0.35 is usually subtle/nice for polishing
+            result = pipe(
+                prompt=prompt,
+                negative_prompt=negative_prompt,
+                image=flow_out_pil,
+                strength=0.17,            # how far back in the noise schedule to jump
+                guidance_scale=2.0,         # keep moderate to avoid content drift
+                num_inference_steps=10,     # 20–40 is common for refinement
+                generator=torch.Generator(device).manual_seed(42),
+            )
+            refined = result.images[0]
+            refined.save("refined_sdedit.png")
+            # Edit ends: Use SD to "clean up" the image
 
             nsfw_score = [x["score"] for x in nsfw_classifier(img) if x["label"] == "nsfw"][0]
             
