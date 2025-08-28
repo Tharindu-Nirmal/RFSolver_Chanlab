@@ -124,13 +124,17 @@ def ddnm_simple(x0t, y, lambda_t=0.1, IR_mode="super resolution"):
 # https://github.com/wyhuai/DDNM
 
     A = set_operator(x0t.shape, IR_mode)
-    Ap = set_pinv_operator(x0t.shape, IR_mode)  
-        
-    # For debugging dimensions.
+    Ap = set_pinv_operator(x0t.shape, IR_mode)
+
+    # Seaprate lines for debugging:  
+    # print(f"DDNM step input: x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}; y min={y.min().item():.4f}, max={y.max().item():.4f}")    
+    
     y0_hat = A(x0t)
     yres = y - y0_hat
     xres = Ap(yres)
     x0t= x0t + lambda_t*xres
+    # print(f"DDNM step: y0_hat min={y0_hat.min().item():.4f}, max={y0_hat.max().item():.4f}; yres min={yres.min().item():.4f}, max={yres.max().item():.4f}; xres min={xres.min().item():.4f}, max={xres.max().item():.4f}, x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}")
+    # x0t = torch.clamp(x0t, 0, 255)
 
     # x0t= x0t + lambda_t*Ap(y - A(x0t))
     

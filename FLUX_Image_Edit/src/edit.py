@@ -122,10 +122,10 @@ def main(
     #Creating y tensor to repeatedly be used in sampling.py-->ddnm_simple
     y = torch.from_numpy(init_image).float().unsqueeze(0) / 127.5 - 1 # [1,320,480,3] and normalise as done in encode()
     B,H,W,C = y.shape
-    assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
-
+    
     # If the degradation type by nature downsizes the image, we need to do it. The dataset is assumed to be in the same size as the init_image.
     if degradation_type == "super resolution":
+        assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
         y = rearrange(y, 'b (h s1) (w s2) c-> b c h w s1 s2', s1=scale_h, s2=scale_w)
         y = y.mean(dim=(-1, -2))  # [1, 3, 80, 120]
     
@@ -142,18 +142,18 @@ def main(
     init_image = encode(init_image, torch_device, ae) # [1, 16, 40, 60]
 
 
-    #Creating y_enc: An encoded version of the degraded image in latent space. (Didnt have a big improvement before)
-    # used in inversion. sampling.py-->ddnm_simple
-    y_enc = init_image # [1, 16, 40, 60]
-    B,C,H,W = y_enc.shape
-    assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
+    # #Creating y_enc: An encoded version of the degraded image in latent space. (Didnt have a big improvement before)
+    # #used in inversion. sampling.py-->ddnm_simple
+    # y_enc = init_image # [1, 16, 40, 60]
+    # B,C,H,W = y_enc.shape
+    # assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
 
-    #Average pooling
-    y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
-    y_enc = y_enc.mean(dim=(-1, -2))  # [1, 16, 10, 15]
-    #didnt rescale the image, or move y_enc to torch_deivce, because enode already does it.
-    # print('y_enc shape:', y_enc.shape)
-    # print(f"y_enc Tensor range: min={y_enc.min().item():.4f}, max={y_enc.max().item():.4f}")
+    # #Average pooling
+    # y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
+    # y_enc = y_enc.mean(dim=(-1, -2))  # [1, 16, 10, 15]
+    # #didnt rescale the image, or move y_enc to torch_deivce, because enode already does it.
+    # # print('y_enc shape:', y_enc.shape)
+    # # print(f"y_enc Tensor range: min={y_enc.min().item():.4f}, max={y_enc.max().item():.4f}")
     
 
     #=======================edits end===============
@@ -208,14 +208,14 @@ def main(
             model = model.to(torch_device)
 
         # inversion to go from image latent to initial noise latent
-        z, info = denoise(model, **inp, timesteps=timesteps, y_enc=y_enc, y=y, width=width, height=height, guidance=1, inverse=True, info=info)
+        z, info = denoise(model, **inp, timesteps=timesteps, y=y, width=width, height=height, guidance=1, inverse=True, info=info)
         
         inp_target["img"] = z
 
         timesteps = get_schedule(opts.num_steps, inp_target["img"].shape[1], shift=(name != "flux-schnell"))
 
         # denoise initial noise
-        x, _ = denoise(model, **inp_target, timesteps=timesteps, y_enc=y_enc, y=y, width=opts.width, height=opts.height, guidance=guidance, inverse=False, info=info)
+        x, _ = denoise(model, **inp_target, timesteps=timesteps, y=y, width=opts.width, height=opts.height, guidance=guidance, inverse=False, info=info)
         
         if offload:
             model.cpu()
@@ -253,7 +253,8 @@ def main(
             x = embed_watermark(x.float())
             x = rearrange(x[0], "c h w -> h w c")
 
-            img = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())
+            img = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy()) #[0,255]
+
             nsfw_score = [x["score"] for x in nsfw_classifier(img) if x["label"] == "nsfw"][0]
             
             if nsfw_score < NSFW_THRESHOLD:

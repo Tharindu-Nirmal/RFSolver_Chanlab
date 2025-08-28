@@ -10,7 +10,7 @@ from .modules.conditioner import HFEmbedder
 
 from .ddnm_degrads import ddnm_simple
 from .util import (load_ae)
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 
 def prepare(t5: HFEmbedder, clip: HFEmbedder, img: Tensor, prompt: str | list[str]) -> dict[str, Tensor]:
@@ -89,6 +89,61 @@ def unpack(x: Tensor, height: int, width: int) -> Tensor:
         pw=2,
     )
 
+# --- helpers for debugging---
+def tensor_chw_neg1to1_to_pil(x_chw: torch.Tensor) -> Image.Image:
+    """
+    x_chw: torch.Tensor with shape (C,H,W), values in [-1,1]
+    returns: PIL RGB image
+    """
+    x = x_chw.detach().float().clamp(-1, 1)
+    x = (x + 1.0) * 127.5  # to [0,255]
+    x = x.round().clamp(0, 255).to(torch.uint8)
+    x = rearrange(x, "c h w -> h w c").cpu().numpy()
+    return Image.fromarray(x, mode="RGB")
+
+def save_image_grid_with_labels(images, labels, out_path, cols=6, pad=8, caption_h=22, bg=(255,255,255)):
+    """
+    images: list of PIL Images (all same size)
+    labels: list of strings (same length as images)
+    cols:   number of columns in the grid
+    pad:    padding between tiles (px)
+    caption_h: reserved height under each tile for the label
+    """
+    assert len(images) == len(labels) and len(images) > 0
+    w, h = images[0].size
+    n = len(images)
+    rows = math.ceil(n / cols)
+
+    grid_w = pad + cols*(w + pad)
+    grid_h = pad + rows*(h + caption_h + pad)
+
+    canvas = Image.new("RGB", (grid_w, grid_h), bg)
+    draw = ImageDraw.Draw(canvas)
+
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 14)
+    except:
+        font = ImageFont.load_default()
+
+    for idx, (im, text) in enumerate(zip(images, labels)):
+        r = idx // cols
+        c = idx % cols
+        x0 = pad + c*(w + pad)
+        y0 = pad + r*(h + caption_h + pad)
+
+        canvas.paste(im, (x0, y0))
+
+        # textbbox gives (left, top, right, bottom)
+        bbox = draw.textbbox((0, 0), text, font=font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+
+        tx = x0 + (w - tw)//2
+        ty = y0 + h + (caption_h - th)//2
+        draw.text((tx, ty), text, fill=(0,0,0), font=font)
+
+    canvas.save(out_path, quality=95, subsampling=0)
+
 def denoise(
     model: Flux,
     # model input
@@ -99,7 +154,6 @@ def denoise(
     vec: Tensor,
     # sampling parameters
     timesteps: list[float],
-    y_enc: Tensor,
     y: Tensor,
     width,
     height,
@@ -118,8 +172,11 @@ def denoise(
     # ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
     # ddnm_list = [False] * (len(timesteps[:-1]) - info['ddnm_step']) + [True] * info['ddnm_step']
     
-    # print('debug',len(timesteps[:-1]))
-    ddnm_list =  [False]*(len(timesteps[:-1]) - 7) + [True]*5 + [False]*2 
+    # print('debug',len(timesteps[:-1])) #300
+    edit_count = 250 # the last N steps to do the edit
+    final_pad = 240
+    ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
+    # ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
     # print('debug',ddnm_list)
 
     torch_device = torch.device(device)
@@ -134,6 +191,7 @@ def denoise(
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
     step_list = []
+    frames, labels = [], []
     for i, (t_curr, t_prev) in enumerate(zip(timesteps[:-1], timesteps[1:])):
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
         info['t'] = t_prev if inverse else t_curr
@@ -190,17 +248,19 @@ def denoise(
         #     img = ddnm_simple(img, y_enc, lambda_t=0.01, IR_mode="super resolution embeds")
         #     img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
 
-        img_debug = unpack(img, height, width) #[B,C,H,W]
-        with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
-            img_debug = ae.decode(img_debug)
-        
-        # Debugging: Save the image as of this point
-        # # bring into PIL format and save
-        x_debug = img_debug.clamp(-1, 1)
-        x_debug = rearrange(x_debug[0], "c h w -> h w c")
-        img_x_debug = Image.fromarray((127.5 * (x_debug + 1.0)).cpu().byte().numpy())
-        img_x_debug.save('test_inverse%s_timestep%d.png'%('img2noise' if inverse else 'noise2img', i), quality=95, subsampling=0)
 
+        # Debugging: Save the image as of this point
+        if i % 10 == 0 or i == len(timesteps[:-1]) - 1:
+            img_debug = unpack(img, height, width) #[B,C,H,W]
+            with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
+                img_debug = ae.decode(img_debug)   #[B,C,H,W], ~[-1,1]
+            
+            # bring into PIL format and save
+            x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
+            frames.append(x_debug)
+            labels.append(f"iter {i}")
+
+        
         #ddnm update in image space. y should be in image space.
         if (not(inverse) and info['ddnm']):
             # decode
@@ -218,7 +278,7 @@ def denoise(
 
             # print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
             # print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
-            img = ddnm_simple(img, y, lambda_t=0.01, IR_mode="colorization") # both y and img are in [B,C,H,W]
+            img = ddnm_simple(img, y, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
 
             # The only relevant part from the encode() function
             img = ae.encode(img.to()).to(torch.bfloat16)
@@ -226,6 +286,11 @@ def denoise(
 
             # The only relevant part in the prepare() function
             img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
+
+    # After the loop, save one grid image with captions
+    save_image_grid_with_labels(frames, labels,out_path=f"debug_grid_{'img2noise' if inverse else 'noise2img'}.png",
+                                cols=6, pad=8, caption_h=22)
+    
 
     return img, info
 
