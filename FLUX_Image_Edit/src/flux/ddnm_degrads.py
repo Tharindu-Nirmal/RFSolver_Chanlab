@@ -119,13 +119,17 @@ def set_pinv_operator(img_shape, IR_mode):
 
 
 # ------------ DDNM pipeline function to be imported to the edit.py script -----------
-def ddnm_simple(x0t, y, lambda_t=0.1, IR_mode="super resolution"):
+def ddnm_simple(xt, y, z, t, lambda_t=0.1, IR_mode="super resolution"):
 # Refer: https://arxiv.org/pdf/2212.00490
 # https://github.com/wyhuai/DDNM
+
+    x0t = xt
+    # x0t = (xt - (1-t)*z)/ (t + 1e-10)
 
     A = set_operator(x0t.shape, IR_mode)
     Ap = set_pinv_operator(x0t.shape, IR_mode)
 
+    # x0t= x0t + lambda_t*Ap(y - A(x0t))
     # Seaprate lines for debugging:  
     # print(f"DDNM step input: x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}; y min={y.min().item():.4f}, max={y.max().item():.4f}")    
     
@@ -136,9 +140,10 @@ def ddnm_simple(x0t, y, lambda_t=0.1, IR_mode="super resolution"):
     # print(f"DDNM step: y0_hat min={y0_hat.min().item():.4f}, max={y0_hat.max().item():.4f}; yres min={yres.min().item():.4f}, max={yres.max().item():.4f}; xres min={xres.min().item():.4f}, max={xres.max().item():.4f}, x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}")
     # x0t = torch.clamp(x0t, 0, 255)
 
-    # x0t= x0t + lambda_t*Ap(y - A(x0t))
+    xt = x0t
+    # xt = (1-t)*z + t*x0t
     
-    return x0t
+    return xt
 
 
 

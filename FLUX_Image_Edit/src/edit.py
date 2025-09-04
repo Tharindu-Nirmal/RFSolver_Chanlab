@@ -211,14 +211,15 @@ def main(
             model = model.to(torch_device)
 
         # inversion to go from image latent to initial noise latent
-        z, info = denoise(model, **inp, timesteps=timesteps, y=y, width=width, height=height, guidance=1, inverse=True, info=info)
+        z = torch.randn_like(inp["img"])
+        z, info = denoise(model, **inp, timesteps=timesteps, y=y, z=z, width=width, height=height, guidance=1, inverse=True, info=info)
         
         inp_target["img"] = z
 
         timesteps = get_schedule(opts.num_steps, inp_target["img"].shape[1], shift=(name != "flux-schnell"))
 
         # denoise initial noise
-        x, _ = denoise(model, **inp_target, timesteps=timesteps, y=y, width=opts.width, height=opts.height, guidance=guidance, inverse=False, info=info)
+        x, _ = denoise(model, **inp_target, timesteps=timesteps, y=y, z=z, width=opts.width, height=opts.height, guidance=guidance, inverse=False, info=info)
         
         if offload:
             model.cpu()
@@ -258,29 +259,29 @@ def main(
 
             img = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy()) #[0,255]
 
-            # Edits start: Use SD to "clean up" the image
-            pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0",torch_dtype=torch.float16,).to(torch_device)
-            pipe.enable_model_cpu_offload()  # memory-friendly; or use .to(device) only
+            # # Edits start: Use SD to "clean up" the image
+            # pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0",torch_dtype=torch.float16,).to(torch_device)
+            # pipe.enable_model_cpu_offload()  # memory-friendly; or use .to(device) only
 
-            # flow_output which is in PIL format is sent as input to SD
-            flow_out_pil = img # shape (H,W,3), dtype=uint8
+            # # flow_output which is in PIL format is sent as input to SD
+            # flow_out_pil = img # shape (H,W,3), dtype=uint8
 
-            prompt = "photo-realistic, clean details, sharp edges, natural colors"
-            negative_prompt = "blur, artifacts, oversharpening, waxy skin, banding"
+            # prompt = "photo-realistic, clean details, sharp edges, natural colors"
+            # negative_prompt = "blur, artifacts, oversharpening, waxy skin, banding"
 
-            # SDEdit refinement: strength≈0.2–0.35 is usually subtle/nice for polishing
-            result = pipe(
-                prompt=prompt,
-                negative_prompt=negative_prompt,
-                image=flow_out_pil,
-                strength=0.17,            # how far back in the noise schedule to jump
-                guidance_scale=2.0,         # keep moderate to avoid content drift
-                num_inference_steps=10,     # 20–40 is common for refinement
-                generator=torch.Generator(device).manual_seed(42),
-            )
-            refined = result.images[0]
-            refined.save("refined_sdedit.png")
-            # Edit ends: Use SD to "clean up" the image
+            # # SDEdit refinement: strength≈0.2–0.35 is usually subtle/nice for polishing
+            # result = pipe(
+            #     prompt=prompt,
+            #     negative_prompt=negative_prompt,
+            #     image=flow_out_pil,
+            #     strength=0.17,            # how far back in the noise schedule to jump
+            #     guidance_scale=2.0,         # keep moderate to avoid content drift
+            #     num_inference_steps=10,     # 20–40 is common for refinement
+            #     generator=torch.Generator(device).manual_seed(42),
+            # )
+            # refined = result.images[0]
+            # refined.save("refined_sdedit.png")
+            # # Edit ends: Use SD to "clean up" the image
 
             nsfw_score = [x["score"] for x in nsfw_classifier(img) if x["label"] == "nsfw"][0]
             

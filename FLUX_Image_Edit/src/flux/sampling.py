@@ -155,6 +155,7 @@ def denoise(
     # sampling parameters
     timesteps: list[float],
     y: Tensor,
+    z: Tensor,
     width,
     height,
     inverse,
@@ -250,15 +251,15 @@ def denoise(
 
 
         # Debugging: Save the image as of this point
-        if i % 10 == 0 or i == len(timesteps[:-1]) - 1:
-            img_debug = unpack(img, height, width) #[B,C,H,W]
-            with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
-                img_debug = ae.decode(img_debug)   #[B,C,H,W], ~[-1,1]
-            
-            # bring into PIL format and save
-            x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
-            frames.append(x_debug)
-            labels.append(f"iter {i}")
+        # if i % 1 == 0 or i == len(timesteps[:-1]) - 1:
+        img_debug = unpack(img, height, width) #[B,C,H,W]
+        with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
+            img_debug = ae.decode(img_debug)   #[B,C,H,W], ~[-1,1]
+        
+        # bring into PIL format and save
+        x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
+        frames.append(x_debug)
+        labels.append(f"itr{i}_t={info['t']}")
 
         
         #ddnm update in image space. y should be in image space.
@@ -268,17 +269,18 @@ def denoise(
             with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
                 img = ae.decode(img)
             
-            # Debugging: Save the image as of this point
-            # # bring into PIL format and save
-            x = img.clamp(-1, 1)
-            x = rearrange(x[0], "c h w -> h w c")
-            img_x = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())
-            img_x.save('test_ddnm_timestep%d.png'%(i), quality=95, subsampling=0)
-            # assert 1==0
+            # # Debugging: Save the image as of this point
+            # # # bring into PIL format and save
+            # x = img.clamp(-1, 1)
+            # x = rearrange(x[0], "c h w -> h w c")
+            # img_x = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())
+            # img_x.save('test_ddnm_timestep%d.png'%(i), quality=95, subsampling=0)
+            # # assert 1==0
 
             # print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
             # print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
-            img = ddnm_simple(img, y, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
+            t = info['t']/len(timesteps[:-1])
+            img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
 
             # The only relevant part from the encode() function
             img = ae.encode(img.to()).to(torch.bfloat16)
