@@ -123,8 +123,8 @@ def ddnm_simple(xt, y, z, t, lambda_t=0.1, IR_mode="super resolution"):
 # Refer: https://arxiv.org/pdf/2212.00490
 # https://github.com/wyhuai/DDNM
 
-    x0t = xt
-    # x0t = (xt - (1-t)*z)/ (t + 1e-10)
+    # x0t = xt
+    x0t = (xt - (t)*z)/ ((1-t) + 1e-10)
 
     A = set_operator(x0t.shape, IR_mode)
     Ap = set_pinv_operator(x0t.shape, IR_mode)
@@ -140,8 +140,8 @@ def ddnm_simple(xt, y, z, t, lambda_t=0.1, IR_mode="super resolution"):
     # print(f"DDNM step: y0_hat min={y0_hat.min().item():.4f}, max={y0_hat.max().item():.4f}; yres min={yres.min().item():.4f}, max={yres.max().item():.4f}; xres min={xres.min().item():.4f}, max={xres.max().item():.4f}, x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}")
     # x0t = torch.clamp(x0t, 0, 255)
 
-    xt = x0t
-    # xt = (1-t)*z + t*x0t
+    # xt = x0t
+    xt = (t)*z + (1-t)*x0t
     
     return xt
 

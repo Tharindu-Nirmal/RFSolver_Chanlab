@@ -211,10 +211,10 @@ def main(
             model = model.to(torch_device)
 
         # inversion to go from image latent to initial noise latent
-        z = torch.randn_like(inp["img"])
+        z = torch.randn_like(inp["img"]) #dummy variable in latent space
         z, info = denoise(model, **inp, timesteps=timesteps, y=y, z=z, width=width, height=height, guidance=1, inverse=True, info=info)
         
-        inp_target["img"] = z
+        inp_target["img"] = z 
 
         timesteps = get_schedule(opts.num_steps, inp_target["img"].shape[1], shift=(name != "flux-schnell"))
 

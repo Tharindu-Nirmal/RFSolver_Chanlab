@@ -101,7 +101,7 @@ def tensor_chw_neg1to1_to_pil(x_chw: torch.Tensor) -> Image.Image:
     x = rearrange(x, "c h w -> h w c").cpu().numpy()
     return Image.fromarray(x, mode="RGB")
 
-def save_image_grid_with_labels(images, labels, out_path, cols=6, pad=8, caption_h=22, bg=(255,255,255)):
+def save_image_grid_with_labels(images, labels, out_path, cols=3, pad=8, caption_h=22, bg=(255,255,255)):
     """
     images: list of PIL Images (all same size)
     labels: list of strings (same length as images)
@@ -183,12 +183,17 @@ def denoise(
     torch_device = torch.device(device)
     ae = load_ae(name, device="cpu" if offload else torch_device)
     
-    
+    #having the z latent in image space for ddnm update
+    z = unpack(z, height, width) #[B,C,H,W]
+    with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
+        z = ae.decode(z)
+
     #"Inverting" in this code is the processing of converting the image into noise.
     if inverse:
         timesteps = timesteps[::-1]
         inject_list = inject_list[::-1]
         ddnm_list = ddnm_list[::-1]
+
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
     step_list = []
@@ -249,23 +254,11 @@ def denoise(
         #     img = ddnm_simple(img, y_enc, lambda_t=0.01, IR_mode="super resolution embeds")
         #     img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
 
-
-        # Debugging: Save the image as of this point
-        # if i % 1 == 0 or i == len(timesteps[:-1]) - 1:
-        img_debug = unpack(img, height, width) #[B,C,H,W]
-        with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
-            img_debug = ae.decode(img_debug)   #[B,C,H,W], ~[-1,1]
-        
-        # bring into PIL format and save
-        x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
-        frames.append(x_debug)
-        labels.append(f"itr{i}_t={info['t']}")
-
-        
         #ddnm update in image space. y should be in image space.
         if (not(inverse) and info['ddnm']):
             # decode
             img = unpack(img, height, width) #[B,C,H,W]
+            
             with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
                 img = ae.decode(img)
             
@@ -279,7 +272,10 @@ def denoise(
 
             # print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
             # print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
+
+
             t = info['t']/len(timesteps[:-1])
+
             img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
 
             # The only relevant part from the encode() function
@@ -288,6 +284,17 @@ def denoise(
 
             # The only relevant part in the prepare() function
             img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
+
+        # Debugging: Convert to image space and save as of this point
+        # if i % 1 == 0 or i == len(timesteps[:-1]) - 1:
+        img_debug = unpack(img, height, width) #[B,C,H,W]
+        with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
+            img_debug = ae.decode(img_debug)   #[B,C,H,W], ~[-1,1]
+        
+        # bring into PIL format and save
+        x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
+        frames.append(x_debug)
+        labels.append(f"itr{i}_t={info['t']}")
 
     # After the loop, save one grid image with captions
     save_image_grid_with_labels(frames, labels,out_path=f"debug_grid_{'img2noise' if inverse else 'noise2img'}.png",
