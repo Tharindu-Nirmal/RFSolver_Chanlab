@@ -101,7 +101,7 @@ def tensor_chw_neg1to1_to_pil(x_chw: torch.Tensor) -> Image.Image:
     x = rearrange(x, "c h w -> h w c").cpu().numpy()
     return Image.fromarray(x, mode="RGB")
 
-def save_image_grid_with_labels(images, labels, out_path, cols=3, pad=8, caption_h=22, bg=(255,255,255)):
+def save_image_grid_with_labels(images, labels, out_path, cols=6, pad=8, caption_h=22, bg=(255,255,255)):
     """
     images: list of PIL Images (all same size)
     labels: list of strings (same length as images)
@@ -293,6 +293,9 @@ def denoise(
         
         # bring into PIL format and save
         x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
+        if (not inverse):
+            # save the the images from noise-> img path separately
+            x_debug.save('test_itr%d_t=%.4f.png'%(i, info['t']), quality=95, subsampling=0)
         frames.append(x_debug)
         labels.append(f"itr{i}_t={info['t']}")
 
