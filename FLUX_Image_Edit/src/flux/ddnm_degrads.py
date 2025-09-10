@@ -119,7 +119,7 @@ def set_pinv_operator(img_shape, IR_mode):
 
 
 # ------------ DDNM pipeline function to be imported to the edit.py script -----------
-def ddnm_simple(xt, y, z, t, lambda_t=0.1, IR_mode="super resolution"):
+def ddnm_simple(xt, y, z, t, lambda_t=1, IR_mode="super resolution"):
 # Refer: https://arxiv.org/pdf/2212.00490
 # https://github.com/wyhuai/DDNM
 
@@ -136,14 +136,14 @@ def ddnm_simple(xt, y, z, t, lambda_t=0.1, IR_mode="super resolution"):
     y0_hat = A(x0t)
     yres = y - y0_hat
     xres = Ap(yres)
-    x0t= x0t + lambda_t*xres
+    DDNM_x0t= x0t + lambda_t*xres
     # print(f"DDNM step: y0_hat min={y0_hat.min().item():.4f}, max={y0_hat.max().item():.4f}; yres min={yres.min().item():.4f}, max={yres.max().item():.4f}; xres min={xres.min().item():.4f}, max={xres.max().item():.4f}, x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}")
     # x0t = torch.clamp(x0t, 0, 255)
 
-    # xt = x0t
-    xt = (t)*z + (1-t)*x0t
+    # DDNM_xt = DDNM_x0t
+    DDNM_xt = (t)*z + (1-t)*DDNM_x0t
     
-    return xt
+    return DDNM_xt
 
 
 

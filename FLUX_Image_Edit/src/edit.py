@@ -19,7 +19,7 @@ import numpy as np
 import os
 
 # Sanity check if "cleaning up" is possible
-from diffusers import StableDiffusionXLImg2ImgPipeline
+# from diffusers import StableDiffusionXLImg2ImgPipeline
 
 NSFW_THRESHOLD = 0.85
 

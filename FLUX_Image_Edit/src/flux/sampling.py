@@ -273,9 +273,8 @@ def denoise(
             # print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
             # print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
 
-
-            t = info['t']/len(timesteps[:-1])
-
+            t = info['t']
+            print('time t=',t)
             img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
 
             # The only relevant part from the encode() function
@@ -295,7 +294,7 @@ def denoise(
         x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
         if (not inverse):
             # save the the images from noise-> img path separately
-            x_debug.save('test_itr%d_t=%.4f.png'%(i, info['t']), quality=95, subsampling=0)
+            x_debug.save('test_itr%.2d.png'%(i), quality=95, subsampling=0)
         frames.append(x_debug)
         labels.append(f"itr{i}_t={info['t']}")
 
