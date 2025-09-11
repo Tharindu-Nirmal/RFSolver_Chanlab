@@ -6,10 +6,10 @@ COMMON_ARGS="--num_steps 30 --name 'flux-dev' --offload"
 
 # Define runs as individual strings (no line breaks inside array entries)
 # Single image tests
-# runs=(
-# "--source_prompt \"A black and white image of a leopard\" --target_prompt \"A colorful image of a leopard. The tree is brown, with green leaves. The sky in the background is blue.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/134049.jpg"
+runs=(
+"--source_prompt \"A black and white image of a leopard\" --target_prompt \"A colorful image of a leopard. The tree is brown, with green leaves. The sky in the background is blue.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/134049.jpg"
 # # "--source_prompt \"A black and white image of a giraffe. The background has trees and the sky behind them. There are grass patches on the floor.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue in the background. The trees and shrubs are green in color. The ground has brown colored dirt. The image is colorful with a realistic color palette.\" --guidance 4 --inject 10 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
-# )
+)
 
 
 # group runs for super-resolution
