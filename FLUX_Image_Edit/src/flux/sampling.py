@@ -174,8 +174,8 @@ def denoise(
     # ddnm_list = [False] * (len(timesteps[:-1]) - info['ddnm_step']) + [True] * info['ddnm_step']
     
     # print('debug',len(timesteps[:-1])) #30 or 300
-    edit_count = 5 # last steps to do the edit
-    final_pad = 2 # last steps to skip ddnm
+    edit_count = 15 # last steps to do the edit
+    final_pad = 10 # last steps to skip ddnm
     ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
     # ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
     # print('debug',ddnm_list)
