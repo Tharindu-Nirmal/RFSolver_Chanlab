@@ -7,10 +7,9 @@ COMMON_ARGS="--num_steps 30 --name 'flux-dev' --offload"
 # Define runs as individual strings (no line breaks inside array entries)
 # Single image tests
 runs=(
-# "--source_prompt \"A black and white image of a leopard\" --target_prompt \"A colorful image of a leopard. The tree is brown, with green leaves. The sky in the background is blue.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/134049.jpg"
-"--source_prompt \"A black and white image of a giraffe.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue and the background has greenery.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
+"--source_prompt \"A black and white image of a leopard\" --target_prompt \"A colorful image of a leopard. The tree is brown, with green leaves. The sky in the background is blue.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/134049.jpg"
+# "--source_prompt \"A black and white image of a giraffe.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue and the background has greenery.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
 )
-# repo debug
 
 # group runs for super-resolution
 # runs=(

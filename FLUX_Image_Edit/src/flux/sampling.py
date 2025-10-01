@@ -9,6 +9,7 @@ from .model import Flux
 from .modules.conditioner import HFEmbedder
 
 from .ddnm_degrads import ddnm_simple
+from .ddnm_degrads import ddnm_flow
 from .util import (load_ae)
 from PIL import Image, ImageDraw, ImageFont
 
@@ -174,8 +175,8 @@ def denoise(
     # ddnm_list = [False] * (len(timesteps[:-1]) - info['ddnm_step']) + [True] * info['ddnm_step']
     
     # print('debug',len(timesteps[:-1])) #30 or 300
-    edit_count = 15 # last steps to do the edit
-    final_pad = 10 # last steps to skip ddnm
+    edit_count = 5 # last steps to do the edit
+    final_pad = 2 # last steps to skip ddnm
     ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
     # ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
     # print('debug',ddnm_list)
@@ -217,6 +218,7 @@ def denoise(
             guidance=guidance_vec,
             info=info
         )
+        
 
         #Z_(ti + delta ti)
         img_mid = img + (t_prev - t_curr) / 2 * pred
@@ -242,6 +244,9 @@ def denoise(
         #Second order update for the Latent.
         img = img + (t_prev - t_curr) * pred + 0.5 * (t_prev - t_curr) ** 2 * first_order
 
+        # Z_(1) from the PnP-Flow approach:
+        img_clean_hat = img - (t_curr * pred)
+
         #ddnm update in latent space
         # if info['ddnm']:
         #     img = rearrange(img, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=math.ceil(height / 16), w=math.ceil(width / 16), ph=2, pw=2,)
@@ -258,9 +263,13 @@ def denoise(
         if (not(inverse) and info['ddnm']):
             # decode
             img = unpack(img, height, width) #[B,C,H,W]
+            img_clean_hat = unpack(img_clean_hat, height, width) #[B,C,H,W]
+            vt = unpack(pred, height, width) #[B,C,H,W]
             
             with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
                 img = ae.decode(img)
+                img_clean_hat = ae.decode(img_clean_hat)
+                vt = ae.decode(vt)
             
             # # Debugging: Save the image as of this point
             # # # bring into PIL format and save
@@ -275,7 +284,9 @@ def denoise(
 
             t = info['t']
             print('time t=',t)
-            img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
+            # img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
+            print('vt:',vt.shape,' img_clean_hat:', img_clean_hat.shape)
+            img = ddnm_flow(img_clean_hat, y, vt, t, lambda_t=1, IR_mode="colorization") # both y and img_clean_hat are in [B,C,H,W]
 
             # The only relevant part from the encode() function
             img = ae.encode(img.to()).to(torch.bfloat16)
