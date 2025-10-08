@@ -2,6 +2,7 @@ import math
 from typing import Callable
 
 import torch
+from torch.distributions import Beta
 from einops import rearrange, repeat
 from torch import Tensor
 
@@ -12,6 +13,7 @@ from .ddnm_degrads import ddnm_simple
 from .ddnm_degrads import ddnm_flow
 from .util import (load_ae)
 from PIL import Image, ImageDraw, ImageFont
+import matplotlib.pyplot as plt
 
 
 def prepare(t5: HFEmbedder, clip: HFEmbedder, img: Tensor, prompt: str | list[str]) -> dict[str, Tensor]:
@@ -145,6 +147,75 @@ def save_image_grid_with_labels(images, labels, out_path, cols=6, pad=8, caption
 
     canvas.save(out_path, quality=95, subsampling=0)
 
+def make_lambda_schedule(timesteps: list[float],*,
+    tail_frac: float = 0.22,    # e.g., last 22% of steps carry nonzeros
+    peak_at: float = 0.90,      # mode inside the *windowed* [0,1]
+    rise_smooth: float = 100.0, # bigger => gentler/slower rise (affects 'a')
+    drop_sharp: float = 10.0,   # bigger => sharper fall (affects 'b')
+    pre_peak_atten: float = 2.5,  # >1 narrows the peak; <1 fattens it
+    power: float = 1.6,         # gamma for extra attenuation before peak
+    floor: float = 0.0,         # min λ (0 keeps truly off before the window)
+    final_pad: int = 1,         # force last N steps to zero (stability)
+) -> torch.Tensor:
+    import torch
+    from torch.distributions import Beta
+
+    T = len(timesteps) - 1
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dtype = torch.float32
+    if T <= 0:
+        return torch.zeros(0, device=device, dtype=dtype)
+
+    # Iteration-aligned progress: u=0 at i=0, u=1 at i=T-1 for *current loop order*
+    u = torch.linspace(0.0, 1.0, T, device=device, dtype=dtype)
+
+    # ---- Window the last tail_frac of steps only ----
+    tail_frac = float(min(max(tail_frac, 1e-3), 0.99))
+    u_start = 1.0 - tail_frac
+    in_tail = (u >= u_start).float()
+    u_tail = torch.zeros_like(u)
+    denom = (1.0 - u_start)
+    u_tail[in_tail.bool()] = (u[in_tail.bool()] - u_start) / denom  # [u_start,1]→[0,1]
+
+    # ---- Beta shape on the windowed coordinate ----
+    b = max(drop_sharp, 2.0)
+    a_raw = (1.0 + peak_at * (b - 2.0)) / max(1e-3, (1.0 - peak_at))
+    a = max(2.0, a_raw + max(0.0, rise_smooth - 1.0))
+
+    dist = Beta(torch.tensor(a, device=device, dtype=dtype),
+                torch.tensor(b, device=device, dtype=dtype))
+    pdf = dist.log_prob(torch.clamp(u_tail, 1e-5, 1.0 - 1e-5)).exp()
+    pdf = pdf / (pdf.max() + 1e-8)
+
+    # Pre-peak attenuation + optional narrowing
+    if pre_peak_atten != 1.0:
+        pdf = pdf * torch.pow(torch.clamp(u_tail, 0.0, 1.0), pre_peak_atten)
+    if power != 1.0:
+        pdf = torch.pow(pdf, power)
+        pdf = pdf / (pdf.max() + 1e-8)
+
+    # Apply window, hard-pad last N steps (in current loop order)
+    lam = pdf * in_tail
+    if final_pad > 0 and final_pad < T:
+        lam[-final_pad:] = 0.0
+
+    # Renormalize after masking/padding so peak==1 (unless all zero)
+    m = lam.max()
+    if m > 0:
+        lam = lam / m
+    else:
+        # fallback: put a spike at the last kept index
+        last_kept = max(0, T - final_pad - 1)
+        lam[last_kept] = 1.0
+
+    # Optional floor
+    if floor > 0:
+        lam = torch.clamp(lam, min=floor, max=1.0)
+
+    return lam
+
+
+
 def denoise(
     model: Flux,
     # model input
@@ -173,12 +244,16 @@ def denoise(
     # edits for ddnm update: The order here is for going from noise to image.
     # ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
     # ddnm_list = [False] * (len(timesteps[:-1]) - info['ddnm_step']) + [True] * info['ddnm_step']
-    
     # print('debug',len(timesteps[:-1])) #30 or 300
-    edit_count = 5 # last steps to do the edit
-    final_pad = 2 # last steps to skip ddnm
-    ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
-    # ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
+
+    lambda_log: list[float] = []
+    t_log: list[float] = []
+
+
+    # edit_count = 5 # last steps to do the edit
+    # final_pad = 2 # last steps to skip ddnm
+    # ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
+    ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
     # print('debug',ddnm_list)
 
     torch_device = torch.device(device)
@@ -195,10 +270,26 @@ def denoise(
         inject_list = inject_list[::-1]
         ddnm_list = ddnm_list[::-1]
 
+    #Building the lambda schedule regardless if inverse or not.
+    lambda_sched = make_lambda_schedule(timesteps=timesteps,
+        tail_frac=0.25,      # last 15% of steps carry nonzeros
+        peak_at=0.92,        # try 0.88–0.95
+        rise_smooth=30.0,    # gentler/longer rise
+        drop_sharp=10.0,     # sharp fall
+        pre_peak_atten=0.8,  # stronger attenuation before peak
+        power=0.9,           # slightly narrower peak
+        floor=0.0,           # or small e.g. 0.02
+        final_pad=2         # keep your 2-step pad
+    )
+
+    print("λ schedule:", [i for i in lambda_sched.tolist()])
+    print("peak idx:", int(torch.argmax(lambda_sched).item()), "peak val:", float(lambda_sched.max().item()))
+
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
     step_list = []
     frames, labels = [], []
+
     for i, (t_curr, t_prev) in enumerate(zip(timesteps[:-1], timesteps[1:])):
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
         info['t'] = t_prev if inverse else t_curr
@@ -206,6 +297,11 @@ def denoise(
         info['second_order'] = False
         info['inject'] = inject_list[i]
         info['ddnm'] = ddnm_list[i]
+        lambda_t = float(lambda_sched[i].item())
+        info['lambda_t'] = lambda_t
+        lambda_log.append(lambda_t)
+        t_log.append(float(info['t']))
+
 
         #vhat_(ti) in algorithm 1 of the paper
         pred, info = model(
@@ -247,20 +343,9 @@ def denoise(
         # Z_(1) from the PnP-Flow approach:
         img_clean_hat = img - (t_curr * pred)
 
-        #ddnm update in latent space
-        # if info['ddnm']:
-        #     img = rearrange(img, "b (h w) (c ph pw) -> b c (h ph) (w pw)", h=math.ceil(height / 16), w=math.ceil(width / 16), ph=2, pw=2,)
-            
-        #     # confirming the shape of the input degraded image (y= A img) is the measured version of the image (img).
-        #     # print('img shape:',img.shape, 'y_shape:', y.shape)
-
-        #     # Using 4x downsample for y
-        #     print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
-        #     img = ddnm_simple(img, y_enc, lambda_t=0.01, IR_mode="super resolution embeds")
-        #     img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
-
         #ddnm update in image space. y should be in image space.
-        if (not(inverse) and info['ddnm']):
+        if (not(inverse) and (info['ddnm'])):
+        # if (not(inverse) and (lambda_t > 0.0)):
             # decode
             img = unpack(img, height, width) #[B,C,H,W]
             img_clean_hat = unpack(img_clean_hat, height, width) #[B,C,H,W]
@@ -283,10 +368,12 @@ def denoise(
             # print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
 
             t = info['t']
-            print('time t=',t)
+            # print('time t=',t)
+            # print('vt:',vt.shape,' img_clean_hat:', img_clean_hat.shape)
+
             # img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
-            print('vt:',vt.shape,' img_clean_hat:', img_clean_hat.shape)
-            img = ddnm_flow(img_clean_hat, y, vt, t, lambda_t=1, IR_mode="colorization") # both y and img_clean_hat are in [B,C,H,W]
+
+            img = ddnm_flow(img_clean_hat, y, vt, t, lambda_t=lambda_t, IR_mode="colorization") # both y and img_clean_hat are in [B,C,H,W]
 
             # The only relevant part from the encode() function
             img = ae.encode(img.to()).to(torch.bfloat16)
@@ -313,6 +400,30 @@ def denoise(
     save_image_grid_with_labels(frames, labels,out_path=f"debug_grid_{'img2noise' if inverse else 'noise2img'}.png",
                                 cols=6, pad=8, caption_h=22)
     
+
+    # --- Save timesteps and lambda schedule in one image ---
+    try:
+        xs = list(range(len(t_log)))
+
+        fig, ax1 = plt.subplots(figsize=(9,4.5))
+        # Left axis: time t
+        ax1.plot(xs, t_log, marker='o', linewidth=1.5)
+        ax1.set_xlabel('Step index (i)')
+        ax1.set_ylabel('Timestep t', rotation=90)
+        ax1.grid(True, linestyle='--', alpha=0.4)
+
+        # Right axis: lambda_t
+        ax2 = ax1.twinx()
+        ax2.plot(xs, lambda_log, linestyle='--', linewidth=1.8)
+        ax2.set_ylabel('λ_t', rotation=90)
+
+        title_dir = 'img→noise' if inverse else 'noise→img'
+        fig.suptitle(f'Time & λ Schedule ({title_dir}) | steps={len(xs)}  | peak λ={max(lambda_log):.3f}')
+        fig.tight_layout()
+        fig.savefig(f"t_and_lambda_schedule_{'img2noise' if inverse else 'noise2img'}.png", dpi=150)
+        plt.close(fig)
+    except Exception as e:
+        print('Schedule plot failed:', e)
 
     return img, info
 
