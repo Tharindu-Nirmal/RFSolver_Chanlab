@@ -228,6 +228,7 @@ def denoise(
     timesteps: list[float],
     y: Tensor,
     z: Tensor,
+    degradation_type: str,
     width,
     height,
     inverse,
@@ -250,8 +251,8 @@ def denoise(
     t_log: list[float] = []
 
 
-    # edit_count = 5 # last steps to do the edit
-    # final_pad = 2 # last steps to skip ddnm
+    edit_count = 15 # last steps to do the edit
+    final_pad = 12 # last steps to skip ddnm
     # ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
     ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
     # print('debug',ddnm_list)
@@ -272,10 +273,10 @@ def denoise(
 
     #Building the lambda schedule regardless if inverse or not.
     lambda_sched = make_lambda_schedule(timesteps=timesteps,
-        tail_frac=0.25,      # last 15% of steps carry nonzeros
-        peak_at=0.92,        # try 0.88–0.95
-        rise_smooth=30.0,    # gentler/longer rise
-        drop_sharp=10.0,     # sharp fall
+        tail_frac=0.50,      # last 15% of steps carry nonzeros
+        peak_at=0.50,        # try 0.88–0.95
+        rise_smooth=20.0,    # gentler/longer rise
+        drop_sharp=5.0,     # sharp fall
         pre_peak_atten=0.8,  # stronger attenuation before peak
         power=0.9,           # slightly narrower peak
         floor=0.0,           # or small e.g. 0.02
@@ -344,8 +345,8 @@ def denoise(
         img_clean_hat = img - (t_curr * pred)
 
         #ddnm update in image space. y should be in image space.
-        if (not(inverse) and (info['ddnm'])):
-        # if (not(inverse) and (lambda_t > 0.0)):
+        # if (not(inverse) and (info['ddnm'])):
+        if (not(inverse) and (lambda_t > 0.0)):
             # decode
             img = unpack(img, height, width) #[B,C,H,W]
             img_clean_hat = unpack(img_clean_hat, height, width) #[B,C,H,W]
@@ -371,9 +372,9 @@ def denoise(
             # print('time t=',t)
             # print('vt:',vt.shape,' img_clean_hat:', img_clean_hat.shape)
 
-            # img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode="colorization") # both y and img are in [B,C,H,W]
+            img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode=degradation_type) # both y and img are in [B,C,H,W]
 
-            img = ddnm_flow(img_clean_hat, y, vt, t, lambda_t=lambda_t, IR_mode="colorization") # both y and img_clean_hat are in [B,C,H,W]
+            # img = ddnm_flow(img_clean_hat, y, vt, t, lambda_t=lambda_t, IR_mode=degradation_type) # both y and img_clean_hat are in [B,C,H,W]
 
             # The only relevant part from the encode() function
             img = ae.encode(img.to()).to(torch.bfloat16)
@@ -383,7 +384,6 @@ def denoise(
             img = rearrange(img, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
 
         # Debugging: Convert to image space and save as of this point
-        # if i % 1 == 0 or i == len(timesteps[:-1]) - 1:
         img_debug = unpack(img, height, width) #[B,C,H,W]
         with torch.autocast(device_type=torch_device.type, dtype=torch.bfloat16):
             img_debug = ae.decode(img_debug)   #[B,C,H,W], ~[-1,1]

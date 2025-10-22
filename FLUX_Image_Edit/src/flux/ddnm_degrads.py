@@ -5,12 +5,12 @@ import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 
 # ------------- User Settings -------------------
-data_folder = "/scratch/gilbreth/lwickrem/data/HandpickedDegrads/gt"       # Your input image folder
-output_folder = "/scratch/gilbreth/lwickrem/data/HandpickedDegrads/" # Where degraded images will be saved
+data_folder = "/scratch/gilbreth/lwickrem/data/afhq/val/cat"       # Your input image folder
+output_folder = "/scratch/gilbreth/lwickrem/data/afhq_degrads/superres_16x/cat" # Where degraded images will be saved
 IR_mode = "super resolution"  # Select degradation mode
-scale = 4                  # Used for super resolution
-scale_h = 4
-scale_w = 4
+scale = 8                  # Used for super resolution
+scale_h = 8
+scale_w = 8
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # -----------------------------------------------
 
@@ -123,8 +123,8 @@ def ddnm_simple(xt, y, z, t, lambda_t=1, IR_mode="super resolution"):
 # Refer: https://arxiv.org/pdf/2212.00490
 # https://github.com/wyhuai/DDNM
 
-    # x0t = xt
-    x0t = (xt - (t)*z)/ ((1-t) + 1e-10)
+    x0t = xt
+    # x0t = (xt - (t)*z)/ ((1-t) + 1e-10)
 
     A = set_operator(x0t.shape, IR_mode)
     Ap = set_pinv_operator(x0t.shape, IR_mode)
@@ -140,8 +140,8 @@ def ddnm_simple(xt, y, z, t, lambda_t=1, IR_mode="super resolution"):
     # print(f"DDNM step: y0_hat min={y0_hat.min().item():.4f}, max={y0_hat.max().item():.4f}; yres min={yres.min().item():.4f}, max={yres.max().item():.4f}; xres min={xres.min().item():.4f}, max={xres.max().item():.4f}, x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}")
     # x0t = torch.clamp(x0t, 0, 255)
 
-    # DDNM_xt = DDNM_x0t
-    DDNM_xt = (t)*z + (1-t)*DDNM_x0t
+    DDNM_xt = DDNM_x0t
+    # DDNM_xt = (t)*z + (1-t)*DDNM_x0t
     
     return DDNM_xt
 
@@ -176,10 +176,16 @@ def ddnm_flow(x0, y, v, t, lambda_t=1, IR_mode="super resolution"):
 
 
 # --------- Image Processing Pipeline to create the degraded images dataset----------
-if __name__== "__main__":
+if __name__ == "__main__":
     print(f"Using device: {device} for generating degraded images.")
     print(f"Degradation mode: {IR_mode}")
     os.makedirs(output_folder, exist_ok=True)
+
+    # Extra folder for the original (pre-upsample) y only for SR mode
+    original_y_folder = None
+    if IR_mode == "super resolution":
+        original_y_folder = f"{output_folder}_original_y"
+        os.makedirs(original_y_folder, exist_ok=True)
 
     transform = T.ToTensor()
     image_files = [f for f in os.listdir(data_folder) if f.lower().endswith(('jpg', 'png', 'jpeg'))]
@@ -190,14 +196,21 @@ if __name__== "__main__":
         img_tensor = transform(img).unsqueeze(0).to(device)  # (1,3,H,W)
 
         A = set_operator(img_tensor.shape, IR_mode)
-        degraded = A(img_tensor)
+        degraded = A(img_tensor)  # this is the measurement y
 
-        #Ensure the size of degraded image matches the original, otherwise FLUX cant handle small inputs
+        # If super-resolution, also save the *original y* before upsampling
         if IR_mode == "super resolution":
+            # save low-res measurement y
+            y_lr_img = TF.to_pil_image(torch.clamp(degraded.squeeze(0), 0, 1).cpu())
+            y_lr_img.save(os.path.join(original_y_folder, fname))
+
+            # then upsample so FLUX can handle the size
             degraded = PatchUpsample(degraded, scale)
 
+        # Save the (possibly upsampled) degraded image to output_folder
         degraded_img = TF.to_pil_image(torch.clamp(degraded.squeeze(0), 0, 1).cpu())
-
         degraded_img.save(os.path.join(output_folder, fname))
 
+    if IR_mode == "super resolution":
+        print(f"Saved {len(image_files)} LR measurements to {original_y_folder}/")
     print(f"Saved {len(image_files)} degraded images to {output_folder}/")

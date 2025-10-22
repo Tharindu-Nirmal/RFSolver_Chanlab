@@ -1,18 +1,33 @@
 #!/bin/bash
 
 # Define common options
-PYTHON_SCRIPT="edit.py"
+PYTHON_SCRIPT="edit_pnp.py"
 COMMON_ARGS="--num_steps 30 --name 'flux-dev' --offload"
 
 # Define runs as individual strings (no line breaks inside array entries)
-# Single image tests
+# Single image tests for easy data
+# runs=(
+# "--source_prompt \"An image of a man.\" --target_prompt \"A colorful image of a man. The man has brown hair, and black eyes. The man is Caucasian.\" --guidance 4 --inject 5 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/CelebA-HQ-degrads/color/10001.jpg"
+# "--source_prompt \"A low resolution image of a cat into the camera. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --target_prompt \"A high resolution image of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --guidance 4 --inject 8 --ddnm_inject 1 --degradation \"super resolution\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/superres_8x/cat_selected/flickr_cat_000008.jpg"
+# "--source_prompt \"A black and white image of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --target_prompt \"A colorful of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected/flickr_cat_000008.jpg"
+# )
+
+# PnP flow baseline
 runs=(
-# "--source_prompt \"A black and white image of a leopard.\" --target_prompt \"A colorful image of a leopard. The tree is brown, with green leaves. The sky in the background is blue.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/134049.jpg"
-"--source_prompt \"An image of a giraffe looking into the camera.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue and the background has greenery.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
-"--source_prompt \"An image of a giraffe looking into the camera.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue and the background has greenery.\" --guidance 4 --inject 8 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
-"--source_prompt \"An image of a giraffe looking into the camera.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue and the background has greenery.\" --guidance 4 --inject 10 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
-"--source_prompt \"An image of a giraffe looking into the camera.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue and the background has greenery.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
+  # 4× SR example (use the HR image path here)
+  "--target_prompt \"A high-resolution, faithful reconstruction of the same cat.\" --guidance 4.0 --gamma 1 --eta_dn 0.3 --degradation \"super resolution\" --sr_scale 4 --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/superres_4x/cat_selected/flickr_cat_000008.jpg" 
 )
+
+# Single image tests for hard data
+# runs=(
+# "--source_prompt \"A black and white image of a leopard.\" --target_prompt \"A colorful image of a leopard. The tree is brown, with green leaves. The sky in the background is blue.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/134049.jpg"
+# "--source_prompt \"A black and white image of a giraffe.\" --target_prompt \"A colorful image of a giraffe.\" --guidance 4 --inject 1 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
+# "--source_prompt \"A black and white image of a giraffe. The sky and trees are visible behind the giraffe. \" --target_prompt \"A colorful image of a giraffe. The sky and trees are visible behind the giraffe.\" --guidance 4 --inject 1 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
+# "--source_prompt \"An image of a giraffe looking into the camera.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue and the background has greenery.\" --guidance 4 --inject 10 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
+# "--source_prompt \"An image of a giraffe looking into the camera.\" --target_prompt \"A colorful image of a giraffe. The giraffe is brown and white. The sky is blue and the background has greenery.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/130014.jpg"
+# )
+
+
 
 # group runs for super-resolution
 # runs=(
@@ -54,7 +69,8 @@ runs=(
 
 # Output directory base
 # OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_manyimgs"
-OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_trials"
+OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Superres_pnp_flow"
+# OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_celebA_trials"
 
 # Run each experiment
 for i in "${!runs[@]}"; do

@@ -17,35 +17,6 @@ from PIL import Image
 import numpy as np
 
 import os
-import csv
-from pathlib import Path
-
-# metrics
-try:
-    import lpips
-    _LPIPS_AVAILABLE = True
-except Exception:
-    _LPIPS_AVAILABLE = False
-
-try:
-    from skimage.metrics import structural_similarity as ssim, peak_signal_noise_ratio as psnr
-    _SKIMAGE_AVAILABLE = True
-except Exception:
-    _SKIMAGE_AVAILABLE = False
-
-# optional general identity (CLIP image-image similarity)
-try:
-    import open_clip
-    _OPENCLIP_AVAILABLE = True
-except Exception:
-    _OPENCLIP_AVAILABLE = False
-
-# optional face identity (ArcFace via insightface)
-try:
-    from insightface.app import FaceAnalysis
-    _INSIGHT_AVAILABLE = True
-except Exception:
-    _INSIGHT_AVAILABLE = False
 
 # Sanity check if "cleaning up" is possible
 # from diffusers import StableDiffusionXLImg2ImgPipeline
@@ -70,117 +41,6 @@ def encode(init_image, torch_device, ae):
     init_image = init_image.to(torch_device)
     init_image = ae.encode(init_image.to()).to(torch.bfloat16)
     return init_image
-
-def _pil_to_torch_im_01(pil):
-    # to CHW float32 in [0,1]
-    x = np.asarray(pil).astype(np.float32) / 255.0
-    x = torch.from_numpy(x).permute(2, 0, 1).unsqueeze(0)  # [1,3,H,W]
-    return x
-
-def _np_to_torch_im_01(np_img):
-    x = np_img.astype(np.float32) / 255.0
-    x = torch.from_numpy(x).permute(2, 0, 1).unsqueeze(0)  # [1,3,H,W]
-    return x
-
-def _to_m1p1(x_01):
-    return x_01 * 2.0 - 1.0
-
-@torch.inference_mode()
-def compute_metrics_bundle(pil_out, np_in_ref, device, id_metric='clip'):
-    """
-    pil_out: predicted PIL image (RGB, HxW)
-    np_in_ref: degraded input image as np.uint8 [H,W,3]
-    """
-    metrics = {
-        'lpips': None,
-        'ssim': None,
-        'psnr': None,
-        'id_sim': None,   # CLIP cosine or ArcFace cosine
-        'id_metric': id_metric,
-    }
-
-    # --- prep ---
-    x_out_01 = _pil_to_torch_im_01(pil_out)         # [1,3,H,W] float in [0,1]
-    x_in_01  = _np_to_torch_im_01(np_in_ref)        # [1,3,H,W] float in [0,1]
-
-    # put on same device for LPIPS
-    x_out_m1p1 = _to_m1p1(x_out_01).to(device)
-    x_in_m1p1  = _to_m1p1(x_in_01).to(device)
-
-    # --- LPIPS ---
-    if _LPIPS_AVAILABLE:
-        try:
-            lpips_fn = lpips.LPIPS(net='alex').to(device).eval()
-            metrics['lpips'] = float(lpips_fn(x_out_m1p1, x_in_m1p1).item())
-        except Exception:
-            pass
-
-    # --- SSIM / PSNR (CPU, skimage) ---
-    if _SKIMAGE_AVAILABLE:
-        try:
-            out_np = np.asarray(pil_out).astype(np.float32) / 255.0
-            in_np  = np_in_ref.astype(np.float32) / 255.0
-            metrics['ssim'] = float(ssim(in_np, out_np, channel_axis=2, data_range=1.0))
-            metrics['psnr'] = float(psnr(in_np, out_np, data_range=1.0))
-        except Exception:
-            pass
-
-    # --- Identity similarity ---
-    if id_metric == 'clip' and _OPENCLIP_AVAILABLE:
-        try:
-            model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai', device=device)
-            model.eval()
-            with torch.no_grad():
-                im1 = preprocess(pil_out).unsqueeze(0).to(device)
-                im2 = preprocess(Image.fromarray(np_in_ref)).unsqueeze(0).to(device)
-                f1 = model.encode_image(im1).float()
-                f2 = model.encode_image(im2).float()
-                f1 = f1 / (f1.norm(dim=-1, keepdim=True) + 1e-6)
-                f2 = f2 / (f2.norm(dim=-1, keepdim=True) + 1e-6)
-                sim = (f1 @ f2.T).squeeze().item()
-                metrics['id_sim'] = float(sim)  # cosine similarity in [-1,1]
-        except Exception:
-            pass
-
-    if id_metric == 'arcface' and _INSIGHT_AVAILABLE:
-        try:
-            # GPU if available, else CPU
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-            app = FaceAnalysis(name='buffalo_l', providers=providers)
-            app.prepare(ctx_id=0, det_size=(640, 640))
-
-            def _embed(pil):
-                arr = np.asarray(pil)
-                faces = app.get(arr)
-                if not faces:
-                    return None
-                return faces[0].normed_embedding  # L2-normalized
-
-            e_out = _embed(pil_out)
-            e_in  = _embed(Image.fromarray(np_in_ref))
-            if e_out is not None and e_in is not None:
-                sim = float(np.dot(e_out, e_in))  # cosine since both are L2-normed
-                metrics['id_sim'] = sim
-            else:
-                metrics['id_sim'] = None
-        except Exception:
-            pass
-
-    return metrics
-
-def append_metrics_csv(csv_path, row_dict):
-    csv_path = Path(csv_path)
-    csv_path.parent.mkdir(parents=True, exist_ok=True)
-    write_header = not csv_path.exists()
-    with csv_path.open('a', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=[
-            'filename','H','W','seconds',
-            'lpips','ssim','psnr','id_metric','id_sim'
-        ])
-        if write_header:
-            w.writeheader()
-        w.writerow(row_dict)
-
 
 @torch.inference_mode()
 def main(
@@ -250,7 +110,6 @@ def main(
     new_w = shape[1] if shape[1] % 16 == 0 else shape[1] - shape[1] % 16
 
     init_image = init_image[:new_h, :new_w, :]
-    src_np_for_metrics = init_image.copy()  # [H,W,3] uint8, degraded input for comparisons
 
     # Will be passed on as options(opts) in the sampling.py script.
     height, width, c = init_image.shape
@@ -258,8 +117,8 @@ def main(
     #====================edits start==============
     # Scales for average pooling
     print('init_image shape:',init_image.shape) # [320,480,3]
-    scale_h = 4
-    scale_w = 4
+    scale_h = 8
+    scale_w = 8
     if height >= width:
         scale_h,scale_w = scale_w,scale_h # swap if height is greater than width
 
@@ -353,7 +212,7 @@ def main(
 
         # inversion to go from image latent to initial noise latent
         z = torch.randn_like(inp["img"]) #dummy variable in latent space
-        z, info = denoise(model, **inp, timesteps=timesteps, y=y, z=z, degradation_type=degradation_type, width=width, height=height, guidance=guidance, inverse=True, info=info)
+        z, info = denoise(model, **inp, timesteps=timesteps, y=y, z=z, degradation_type=degradation_type, width=width, height=height, guidance=1, inverse=True, info=info)
         
         inp_target["img"] = z 
 
@@ -400,19 +259,6 @@ def main(
 
             img = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy()) #[0,255]
 
-            # Compute metrics BEFORE any early return, so we can still log even if we decide not to save.
-            metrics = None
-            if args.compute_metrics:
-                try:
-                    metrics = compute_metrics_bundle(
-                        pil_out=img,
-                        np_in_ref=src_np_for_metrics,  # degraded input (cropped)
-                        device=torch_device,
-                        id_metric=args.id_metric
-                    )
-                except Exception as e:
-                    print(f"[metrics] error: {e}")
-
             # # Edits start: Use SD to "clean up" the image
             # pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0",torch_dtype=torch.float16,).to(torch_device)
             # pipe.enable_model_cpu_offload()  # memory-friendly; or use .to(device) only
@@ -451,25 +297,6 @@ def main(
             else:
                 print("Your generated image may contain NSFW content.")
 
-            if args.compute_metrics:
-                # Decide dataset-level CSV path:
-                # If you’re using per-image subdirs, this places metrics.csv one level up (the dataset folder).
-                dataset_dir = Path(output_dir).parent if (Path(output_dir).name != Path(args.output_dir).name) else Path(output_dir)
-                csv_path = Path(args.metrics_csv) if args.metrics_csv else dataset_dir / "metrics.csv"
-
-                row = {
-                    'filename': Path(args.source_img_dir).name,
-                    'H': img.height,
-                    'W': img.width,
-                    'seconds': round(t1 - t0, 3),
-                    'lpips': None if metrics is None else metrics['lpips'],
-                    'ssim': None if metrics is None else metrics['ssim'],
-                    'psnr': None if metrics is None else metrics['psnr'],
-                    'id_metric': None if metrics is None else metrics['id_metric'],
-                    'id_sim': None if metrics is None else metrics['id_sim'],
-                }
-                append_metrics_csv(csv_path, row)
-
             if loop:
                 print("-" * 80)
                 opts = parse_prompt(opts)
@@ -503,17 +330,6 @@ if __name__ == "__main__":
     parser.add_argument('--offload', action='store_true', help='set it to True if the memory of GPU is not enough')
     parser.add_argument('--degradation', type=str, default='super resolution',
                         help='degradation mode: super resolution, colorization, old photo restoration, inpainting')
-    
-    parser.add_argument('--compute_metrics', action='store_true',
-                    help='Compute LPIPS/SSIM/PSNR and identity similarity vs input image.')
-    parser.add_argument('--metrics_csv', type=str, default=None,
-                        help='Path to dataset-level CSV file to append metrics. '
-                            'Defaults to <dataset_dir>/metrics.csv')
-
-    # identity choice (general = CLIP, faces = arcface)
-    parser.add_argument('--id_metric', type=str, default='clip', choices=['none', 'clip', 'arcface'],
-                        help='Identity metric to compute in addition to LPIPS/SSIM/PSNR.')
-
 
     args = parser.parse_args()
 

@@ -5,7 +5,7 @@ import torch
 from einops import rearrange
 from torch import Tensor, nn
 
-from flux.math import attention, rope
+from flux.math_utils import attention, rope
 
 import os
 
@@ -245,26 +245,25 @@ class SingleStreamBlock(nn.Module):
 
         # Save the features in the memory if inverse. Else(when going from noise to image), load the features from the memory.
         # There are 38 single blocks in the DiT model. info[id] is the index of the block.
-        if info['inject'] and 19 < info['id'] < 33:
-            # feature_name = str(info['t']) + '_' + str(info['second_order']) + '_' + str(info['id']) + '_' + info['type'] + '_' + 'V'
-            # if info['inverse']:
-            #     info['feature'][feature_name] = v.cpu()
-            # else:
-            #     v = info['feature'][feature_name].cuda()
-            q_feature_name = f"{info['t']}_{info['second_order']}_{info['id']}_{info['type']}_Q"
-            k_feature_name = f"{info['t']}_{info['second_order']}_{info['id']}_{info['type']}_K"
-    
-            if info['inverse']:
-                # Save Q and K tensors
-                info['feature'][q_feature_name] = q.cpu()
-                info['feature'][k_feature_name] = k.cpu()
-            else:
-                # Load Q and K tensors
-                q = info['feature'][q_feature_name].cuda()
-                k = info['feature'][k_feature_name].cuda()
 
-        # compute attention
-        attn = attention(q, k, v, pe=pe)
+        # --- Save/Load ATTENTION instead of Q,K ---
+        use_cache = info['inject'] and 19 < info['id'] < 35
+        attn_feature_name = f"{info['t']}_{info['second_order']}_{info['id']}_{info['type']}_ATTN"
+
+        if use_cache:
+            if info['inverse']:
+                # Compute attention and save a CPU copy
+                attn = attention(q, k, v, pe=pe)
+                if 'feature' not in info:
+                    info['feature'] = {}
+                info['feature'][attn_feature_name] = attn.detach().cpu()
+            else:
+                # Load cached attention (assumes it was saved earlier)
+                attn = info['feature'][attn_feature_name].to(device=x.device, dtype=x.dtype)
+        else:
+            # Fallback: compute attention normally
+            attn = attention(q, k, v, pe=pe)
+
         # compute activation in mlp stream, cat again and run second linear layer
         output = self.linear2(torch.cat((attn, self.mlp_act(mlp)), 2))
         return x + mod.gate * output, info
