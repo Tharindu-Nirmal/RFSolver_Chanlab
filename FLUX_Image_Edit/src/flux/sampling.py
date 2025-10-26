@@ -283,8 +283,8 @@ def denoise(
         final_pad=2         # keep your 2-step pad
     )
 
-    print("λ schedule:", [i for i in lambda_sched.tolist()])
-    print("peak idx:", int(torch.argmax(lambda_sched).item()), "peak val:", float(lambda_sched.max().item()))
+    # print("λ schedule:", [i for i in lambda_sched.tolist()])
+    # print("peak idx:", int(torch.argmax(lambda_sched).item()), "peak val:", float(lambda_sched.max().item()))
 
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
@@ -390,9 +390,9 @@ def denoise(
         
         # bring into PIL format and save
         x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
-        if (not inverse):
-            # save the the images from noise-> img path separately
-            x_debug.save('test_itr%.2d.png'%(i), quality=95, subsampling=0)
+        # if (not inverse):
+        #     # save the the images from noise-> img path separately
+        #     x_debug.save('test_itr%.2d.png'%(i), quality=95, subsampling=0)
         frames.append(x_debug)
         labels.append(f"itr{i}_t={info['t']}")
 

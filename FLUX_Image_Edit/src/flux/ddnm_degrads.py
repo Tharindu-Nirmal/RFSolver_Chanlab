@@ -1,16 +1,28 @@
 import os
 from PIL import Image
+import math
 import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 
 # ------------- User Settings -------------------
-data_folder = "/scratch/gilbreth/lwickrem/data/afhq/val/cat"       # Your input image folder
-output_folder = "/scratch/gilbreth/lwickrem/data/afhq_degrads/superres_16x/cat" # Where degraded images will be saved
-IR_mode = "super resolution"  # Select degradation mode
-scale = 8                  # Used for super resolution
-scale_h = 8
-scale_w = 8
+data_folder = "/scratch/gilbreth/lwickrem/data/afhq_gt/val/cat_selected_1"       # Your input image folder
+output_folder = "/scratch/gilbreth/lwickrem/data/afhq_degrads/deblur/cat_selected_1" # Where degraded images will be saved
+
+# Select degradation mode to create data
+IR_mode = "deblurring"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
+
+# Used for super resolution
+scale = 4                
+scale_h = 4
+scale_w = 4
+
+# Used when IR_mode == "deblurring"
+blur_sigma   = 2      # std dev of Gaussian PSF (in pixels)
+kernel_size  = 11       # odd number, e.g., 11/15/21
+wiener_lambda = 1e-3    # Tikhonov/Wiener regularizer for pinv(A); try 1e-4 .. 1e-2
+
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # -----------------------------------------------
 
@@ -47,6 +59,29 @@ def gray2color(x):
     
     # Stack it back to 3 channels
     return torch.stack([restored, restored, restored], dim=1)  # shape: [N, 3, H, W]
+
+def gaussian_2d_kernel(sigma: float, kernel_size: int, device="cpu", dtype=torch.float32):
+    """
+    Returns a (kernel_size x kernel_size) normalized 2D Gaussian kernel.
+    kernel_size must be odd.
+    """
+    assert kernel_size % 2 == 1, "kernel_size must be odd."
+    ax = torch.arange(kernel_size, device=device, dtype=dtype) - (kernel_size - 1) / 2
+    xx, yy = torch.meshgrid(ax, ax, indexing="ij")
+    k = torch.exp(-(xx**2 + yy**2) / (2 * sigma**2))
+    k = k / k.sum()
+    return k  # shape [K, K]
+
+def _fft_filter_from_kernel(k2d: torch.Tensor, h: int, w: int, c: int, device, dtype):
+    """
+    Center the small kernel into an (h,w) canvas (per-channel), roll to align,
+    and return its FFT. Output shape: [1, c, h, w] in frequency domain.
+    """
+    ks = k2d.shape[-1]
+    filt = torch.zeros((1, c, h, w), device=device, dtype=dtype)
+    filt[..., :ks, :ks] = k2d.to(device=device, dtype=dtype)
+    filt = torch.roll(filt, shifts=(-(ks - 1)//2, -(ks - 1)//2), dims=(2, 3))
+    return torch.fft.fft2(filt)
     
 
 def set_operator(img_shape, IR_mode):
@@ -72,6 +107,24 @@ def set_operator(img_shape, IR_mode):
         #  Embedding dimensions change into [B, Cenc, Henc, Wenc]. So we need new scale_h and scale_w for embeddings.
         down = torch.nn.AdaptiveAvgPool2d((h // scale_h, w // scale_w))
         return lambda z: down(z)
+    
+    # ---- NEW: Denoising ----
+    elif IR_mode == "denoising":
+        # Identity measurement: y = x
+        return lambda z: z
+
+    # ---- NEW: Deblurring (circular conv via FFT) ----
+    elif IR_mode == "deblurring":
+        # Build the blur PSF in frequency once for these image dims
+        _, c, h, w = img_shape
+        k2d = gaussian_2d_kernel(blur_sigma, kernel_size, device="cpu", dtype=torch.float32)
+
+        # Create Ĥ(ω) on-the-fly using the *call-site* device/dtype for safety
+        def A_blur(z: torch.Tensor):
+            H_hat = _fft_filter_from_kernel(k2d, z.shape[-2], z.shape[-1], z.shape[1],
+                                            device=z.device, dtype=z.dtype)
+            return torch.fft.ifft2(torch.fft.fft2(z) * H_hat).real
+        return A_blur
 
     elif IR_mode == "old photo restoration":
         _, _, h, w = img_shape
@@ -103,6 +156,29 @@ def set_pinv_operator(img_shape, IR_mode):
     elif IR_mode == "super resolution embeds":
         # The input to Ap is the downsampled image, so we upsample with PatchUpsample
         return lambda z: PatchUpsampleEmbeds(z, scale_h, scale_w)
+    
+    # ---- NEW: Denoising ----
+    elif IR_mode == "denoising":
+        # Pseudoinverse of Identity is Identity (both left and right inverse)
+        return lambda z: z
+
+    # ---- NEW: Deblurring pinv(A) via Wiener/Tikhonov deconvolution ----
+    elif IR_mode == "deblurring":
+        # A^\dagger y = F^{-1} { H*(ω) / (|H(ω)|^2 + λ) ⊙ F{y} }
+        # This is a *regularized right-inverse*: A(A^\dagger y) ≈ y
+        _, c, h, w = img_shape
+        k2d = gaussian_2d_kernel(blur_sigma, kernel_size, device="cpu", dtype=torch.float32)
+
+        def A_pinv_blur(y: torch.Tensor):
+            H_hat = _fft_filter_from_kernel(k2d, y.shape[-2], y.shape[-1], y.shape[1],
+                                            device=y.device, dtype=y.dtype)
+            Y_hat = torch.fft.fft2(y)
+            denom = (H_hat.conj() * H_hat).real + wiener_lambda  # avoid division by small |H|^2
+            H_pinv = H_hat.conj() / denom
+            x_est = torch.fft.ifft2(Y_hat * H_pinv).real
+            return x_est
+
+        return A_pinv_blur
 
     elif IR_mode == "old photo restoration":
         mask = torch.ones(img_shape, device=device)

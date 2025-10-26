@@ -117,8 +117,8 @@ def main(
     #====================edits start==============
     # Scales for average pooling
     print('init_image shape:',init_image.shape) # [320,480,3]
-    scale_h = 8
-    scale_w = 8
+    scale_h = 4
+    scale_w = 4
     if height >= width:
         scale_h,scale_w = scale_w,scale_h # swap if height is greater than width
 

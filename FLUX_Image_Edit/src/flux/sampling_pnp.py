@@ -299,7 +299,8 @@ def denoise_pnp_fbs(
         x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
         if (not inverse):
             # save the the images from noise-> img path separately
-            x_debug.save('test_itr%.2d.png'%(i), quality=95, subsampling=0)
+            # x_debug.save('test_itr%.2d.png'%(i), quality=95, subsampling=0)
+            pass
         frames.append(x_debug)
         labels.append(f"itr{i}_t={info['t']}")
     
