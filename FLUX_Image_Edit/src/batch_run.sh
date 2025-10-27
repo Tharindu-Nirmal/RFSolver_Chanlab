@@ -9,7 +9,8 @@ COMMON_ARGS="--num_steps 30 --name 'flux-dev' --offload"
 runs=(
 # "--source_prompt \"An image of a man.\" --target_prompt \"A colorful image of a man. The man has brown hair, and black eyes. The man is Caucasian.\" --guidance 4 --inject 5 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/CelebA-HQ-degrads/color/10001.jpg"
 # "--source_prompt \"A low resolution image of a cat into the camera. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --target_prompt \"A high resolution image of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --guidance 4 --inject 8 --ddnm_inject 1 --degradation \"super resolution\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/superres_8x/cat_selected/flickr_cat_000008.jpg"
-"--source_prompt \"A black and white image of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --target_prompt \"A colorful of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1/flickr_cat_000008.jpg"
+# "--source_prompt \"A black and white image of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --target_prompt \"A colorful of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1/flickr_cat_000008.jpg"
+"--source_prompt \"A blurred image of a cat. The cat is white with black patches. The background is dark.\" --target_prompt \"A sharp image of a cat. The cat has white fur with black spots. Highly detailed, taken using a Canon EOS R camera, hyper detailed photo-realistic maximum detail.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/deblur/cat_selected_1/flickr_cat_000008.jpg"
 )
 
 # PnP flow baseline
@@ -68,7 +69,8 @@ runs=(
 
 
 # Output directory base
-OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_manyimgs"
+# OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_manyimgs"
+OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Deblur_ddnm_manyimgs"
 # OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Superres_pnp_flow"
 # OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_celebA_trials"
 

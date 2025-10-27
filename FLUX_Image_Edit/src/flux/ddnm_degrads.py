@@ -10,7 +10,7 @@ data_folder = "/scratch/gilbreth/lwickrem/data/afhq_gt/val/cat_selected_1"      
 output_folder = "/scratch/gilbreth/lwickrem/data/afhq_degrads/deblur/cat_selected_1" # Where degraded images will be saved
 
 # Select degradation mode to create data
-IR_mode = "deblurring"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
+IR_mode = "denoising"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
 
 # Used for super resolution
 scale = 4                
@@ -22,6 +22,8 @@ blur_sigma   = 2      # std dev of Gaussian PSF (in pixels)
 kernel_size  = 11       # odd number, e.g., 11/15/21
 wiener_lambda = 1e-3    # Tikhonov/Wiener regularizer for pinv(A); try 1e-4 .. 1e-2
 
+# Used when IR_mode == "denoising"
+sigma = 5             # noise level in [0,255] intensity units;
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # -----------------------------------------------
@@ -273,6 +275,13 @@ if __name__ == "__main__":
 
         A = set_operator(img_tensor.shape, IR_mode)
         degraded = A(img_tensor)  # this is the measurement y
+
+        # ---- ADD NOISE FOR DENOISING MODE (A = I) ----
+        if IR_mode == "denoising":
+            # sigma is assumed to be in [0,255] intensity units; convert to [0,1]
+            noise_std = torch.as_tensor(sigma, dtype=img_tensor.dtype, device=img_tensor.device) / 255.0
+            noise = torch.randn_like(img_tensor) * noise_std
+            degraded = torch.clamp(img_tensor + noise, 0.0, 1.0)
 
         # If super-resolution, also save the *original y* before upsampling
         if IR_mode == "super resolution":

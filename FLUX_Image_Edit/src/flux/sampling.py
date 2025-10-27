@@ -251,10 +251,10 @@ def denoise(
     t_log: list[float] = []
 
 
-    edit_count = 15 # last steps to do the edit
-    final_pad = 12 # last steps to skip ddnm
-    # ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
-    ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
+    edit_count = 5 # last steps to do the edit
+    final_pad = 3 # last steps to skip ddnm
+    ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
+    # ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
     # print('debug',ddnm_list)
 
     torch_device = torch.device(device)
@@ -345,8 +345,8 @@ def denoise(
         img_clean_hat = img - (t_curr * pred)
 
         #ddnm update in image space. y should be in image space.
-        # if (not(inverse) and (info['ddnm'])):
-        if (not(inverse) and (lambda_t > 0.0)):
+        if (not(inverse) and (info['ddnm'])):
+        # if (not(inverse) and (lambda_t > 0.0)):
             # decode
             img = unpack(img, height, width) #[B,C,H,W]
             img_clean_hat = unpack(img_clean_hat, height, width) #[B,C,H,W]
@@ -372,7 +372,7 @@ def denoise(
             # print('time t=',t)
             # print('vt:',vt.shape,' img_clean_hat:', img_clean_hat.shape)
 
-            img = ddnm_simple(img, y, z, t, lambda_t=1, IR_mode=degradation_type) # both y and img are in [B,C,H,W]
+            img = ddnm_simple(img, y, z, t, lambda_t=0.5, IR_mode=degradation_type) # both y and img are in [B,C,H,W]
 
             # img = ddnm_flow(img_clean_hat, y, vt, t, lambda_t=lambda_t, IR_mode=degradation_type) # both y and img_clean_hat are in [B,C,H,W]
 

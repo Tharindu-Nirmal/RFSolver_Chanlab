@@ -9,11 +9,11 @@ set -euo pipefail
 # ---------------------------------------------------------
 
 # Positional args (with sane fallbacks)
-INPUT_DIR="${1:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1}"   # degraded images (e.g., .../color/)
-GT_DIR="${2:-/scratch/gilbreth/lwickrem/data/afhq_gt/val/cat_selected_1}"             # ground-truth images (RGB), same order
-OUTPUT_DIR="${3:-/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/color_ddnm_cat_selected_1}"
-SOURCE_PROMPTS_TXT="${4:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1/source_prompts.txt}"
-TARGET_PROMPTS_TXT="${5:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1/target_prompts.txt}"
+INPUT_DIR="${1:-/scratch/gilbreth/lwickrem/data/afhq_degrads/deblur/fox_selected}"   # degraded images (e.g., .../color/)
+GT_DIR="${2:-/scratch/gilbreth/lwickrem/data/afhq_gt/val/fox_selected}"             # ground-truth images (RGB), same order
+OUTPUT_DIR="${3:-/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/deblur_ddnm_fox_selected}"
+SOURCE_PROMPTS_TXT="${4:-/scratch/gilbreth/lwickrem/data/afhq_degrads/deblur/fox_selected/source_prompts.txt}"
+TARGET_PROMPTS_TXT="${5:-/scratch/gilbreth/lwickrem/data/afhq_degrads/deblur/fox_selected/target_prompts.txt}"
 # SOURCE_IMG_PATH="${6:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1/flickr_cat_000008.jpg}"
 
 # Script + common args
@@ -26,7 +26,7 @@ COMMON_ARGS=(--num_steps "$NUM_STEPS" --name "$NAME")
 # Hyperparameters (dataset-wide)
 # --------------------------------
 GUIDANCE=4
-INJECT=4
+INJECT=8
 DDNM_INJECT=1
 DEGRADATION="colorization"     # e.g., "colorization" | "super resolution" | "old photo restoration" | "inpainting"
 
