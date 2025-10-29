@@ -11,6 +11,7 @@ from .modules.conditioner import HFEmbedder
 
 from .ddnm_degrads import ddnm_simple
 from .ddnm_degrads import ddnm_flow
+from .lambda_schdules import make_lambda_schedule, make_lambda_ramp_schedule, make_lambda_step_schedule
 from .util import (load_ae)
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
@@ -147,74 +148,6 @@ def save_image_grid_with_labels(images, labels, out_path, cols=6, pad=8, caption
 
     canvas.save(out_path, quality=95, subsampling=0)
 
-def make_lambda_schedule(timesteps: list[float],*,
-    tail_frac: float = 0.22,    # e.g., last 22% of steps carry nonzeros
-    peak_at: float = 0.90,      # mode inside the *windowed* [0,1]
-    rise_smooth: float = 100.0, # bigger => gentler/slower rise (affects 'a')
-    drop_sharp: float = 10.0,   # bigger => sharper fall (affects 'b')
-    pre_peak_atten: float = 2.5,  # >1 narrows the peak; <1 fattens it
-    power: float = 1.6,         # gamma for extra attenuation before peak
-    floor: float = 0.0,         # min λ (0 keeps truly off before the window)
-    final_pad: int = 1,         # force last N steps to zero (stability)
-) -> torch.Tensor:
-    import torch
-    from torch.distributions import Beta
-
-    T = len(timesteps) - 1
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    dtype = torch.float32
-    if T <= 0:
-        return torch.zeros(0, device=device, dtype=dtype)
-
-    # Iteration-aligned progress: u=0 at i=0, u=1 at i=T-1 for *current loop order*
-    u = torch.linspace(0.0, 1.0, T, device=device, dtype=dtype)
-
-    # ---- Window the last tail_frac of steps only ----
-    tail_frac = float(min(max(tail_frac, 1e-3), 0.99))
-    u_start = 1.0 - tail_frac
-    in_tail = (u >= u_start).float()
-    u_tail = torch.zeros_like(u)
-    denom = (1.0 - u_start)
-    u_tail[in_tail.bool()] = (u[in_tail.bool()] - u_start) / denom  # [u_start,1]→[0,1]
-
-    # ---- Beta shape on the windowed coordinate ----
-    b = max(drop_sharp, 2.0)
-    a_raw = (1.0 + peak_at * (b - 2.0)) / max(1e-3, (1.0 - peak_at))
-    a = max(2.0, a_raw + max(0.0, rise_smooth - 1.0))
-
-    dist = Beta(torch.tensor(a, device=device, dtype=dtype),
-                torch.tensor(b, device=device, dtype=dtype))
-    pdf = dist.log_prob(torch.clamp(u_tail, 1e-5, 1.0 - 1e-5)).exp()
-    pdf = pdf / (pdf.max() + 1e-8)
-
-    # Pre-peak attenuation + optional narrowing
-    if pre_peak_atten != 1.0:
-        pdf = pdf * torch.pow(torch.clamp(u_tail, 0.0, 1.0), pre_peak_atten)
-    if power != 1.0:
-        pdf = torch.pow(pdf, power)
-        pdf = pdf / (pdf.max() + 1e-8)
-
-    # Apply window, hard-pad last N steps (in current loop order)
-    lam = pdf * in_tail
-    if final_pad > 0 and final_pad < T:
-        lam[-final_pad:] = 0.0
-
-    # Renormalize after masking/padding so peak==1 (unless all zero)
-    m = lam.max()
-    if m > 0:
-        lam = lam / m
-    else:
-        # fallback: put a spike at the last kept index
-        last_kept = max(0, T - final_pad - 1)
-        lam[last_kept] = 1.0
-
-    # Optional floor
-    if floor > 0:
-        lam = torch.clamp(lam, min=floor, max=1.0)
-
-    return lam
-
-
 
 def denoise(
     model: Flux,
@@ -251,8 +184,8 @@ def denoise(
     t_log: list[float] = []
 
 
-    edit_count = 5 # last steps to do the edit
-    final_pad = 3 # last steps to skip ddnm
+    edit_count = 17 # last steps to do the edit
+    final_pad = 5 # last steps to skip ddnm
     ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
     # ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
     # print('debug',ddnm_list)
@@ -272,15 +205,24 @@ def denoise(
         ddnm_list = ddnm_list[::-1]
 
     #Building the lambda schedule regardless if inverse or not.
-    lambda_sched = make_lambda_schedule(timesteps=timesteps,
-        tail_frac=0.50,      # last 15% of steps carry nonzeros
-        peak_at=0.50,        # try 0.88–0.95
-        rise_smooth=20.0,    # gentler/longer rise
-        drop_sharp=5.0,     # sharp fall
-        pre_peak_atten=0.8,  # stronger attenuation before peak
-        power=0.9,           # slightly narrower peak
-        floor=0.0,           # or small e.g. 0.02
-        final_pad=2         # keep your 2-step pad
+    # lambda_sched = make_lambda_schedule(timesteps=timesteps,
+    #     tail_frac=0.50,      # last 15% of steps carry nonzeros
+    #     peak_at=0.50,        # try 0.88–0.95
+    #     rise_smooth=20.0,    # gentler/longer rise
+    #     drop_sharp=5.0,     # sharp fall
+    #     pre_peak_atten=0.8,  # stronger attenuation before peak
+    #     power=0.9,           # slightly narrower peak
+    #     floor=0.0,           # or small e.g. 0.02
+    #     final_pad=2         # keep your 2-step pad
+    # )
+    lambda_sched = make_lambda_step_schedule(
+        timesteps=timesteps,  # after any reversal
+        start=0.40,           # start of activity
+        step=0.50,            # drop point to 0.5
+        end=0.95,             # end (exclusive)
+        level_hi=1.0,
+        level_lo=0.3,
+        final_pad=1
     )
 
     # print("λ schedule:", [i for i in lambda_sched.tolist()])
@@ -345,8 +287,8 @@ def denoise(
         img_clean_hat = img - (t_curr * pred)
 
         #ddnm update in image space. y should be in image space.
-        if (not(inverse) and (info['ddnm'])):
-        # if (not(inverse) and (lambda_t > 0.0)):
+        # if (not(inverse) and (info['ddnm'])):
+        if (not(inverse) and (lambda_t > 0.0)):
             # decode
             img = unpack(img, height, width) #[B,C,H,W]
             img_clean_hat = unpack(img_clean_hat, height, width) #[B,C,H,W]
@@ -372,7 +314,7 @@ def denoise(
             # print('time t=',t)
             # print('vt:',vt.shape,' img_clean_hat:', img_clean_hat.shape)
 
-            img = ddnm_simple(img, y, z, t, lambda_t=0.5, IR_mode=degradation_type) # both y and img are in [B,C,H,W]
+            img = ddnm_simple(img, y, z, t, lambda_t=lambda_t, IR_mode=degradation_type) # both y and img are in [B,C,H,W]
 
             # img = ddnm_flow(img_clean_hat, y, vt, t, lambda_t=lambda_t, IR_mode=degradation_type) # both y and img_clean_hat are in [B,C,H,W]
 
