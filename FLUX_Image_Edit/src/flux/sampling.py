@@ -217,10 +217,10 @@ def denoise(
     # )
     lambda_sched = make_lambda_step_schedule(
         timesteps=timesteps,  # after any reversal
-        start=0.40,           # start of activity
+        start=0.35,           # start of activity
         step=0.50,            # drop point to 0.5
-        end=0.95,             # end (exclusive)
-        level_hi=1.0,
+        end=0.90,             # end (exclusive)
+        level_hi=0.8,
         level_lo=0.3,
         final_pad=1
     )

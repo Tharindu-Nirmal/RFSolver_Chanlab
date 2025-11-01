@@ -9,11 +9,11 @@ set -euo pipefail
 # ---------------------------------------------------------
 
 # Positional args (with sane fallbacks)
-INPUT_DIR="${1:-/scratch/gilbreth/lwickrem/data/celeba_degrads/color/celeba_women_selected}"   # degraded images (e.g., .../color/)
-GT_DIR="${2:-/scratch/gilbreth/lwickrem/data/celeba_gt/celeba_women_selected}"             # ground-truth images (RGB), same order
-OUTPUT_DIR="${3:-/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/color_ddnm_celeba_women_selected}"  # where to save outputs
-SOURCE_PROMPTS_TXT="${4:-/scratch/gilbreth/lwickrem/data/celeba_degrads/color/celeba_women_selected/source_prompts.txt}"
-TARGET_PROMPTS_TXT="${5:-/scratch/gilbreth/lwickrem/data/celeba_degrads/color/celeba_women_selected/target_prompts.txt}"
+INPUT_DIR="${1:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/leopard_selected}"   # degraded images (e.g., .../color/)
+GT_DIR="${2:-/scratch/gilbreth/lwickrem/data/afhq_gt/val/leopard_selected}"             # ground-truth images (RGB), same order
+OUTPUT_DIR="${3:-/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/color_ddnm_leopard_selected}"  # where to save outputs
+SOURCE_PROMPTS_TXT="${4:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/leopard_selected/source_prompts.txt}"
+TARGET_PROMPTS_TXT="${5:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/leopard_selected/target_prompts.txt}"
 # SOURCE_IMG_PATH="${6:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1/flickr_cat_000008.jpg}"
 
 # Script + common args

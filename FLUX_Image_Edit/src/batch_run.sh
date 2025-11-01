@@ -7,7 +7,8 @@ COMMON_ARGS="--num_steps 30 --name 'flux-dev' --offload"
 # Define runs as individual strings (no line breaks inside array entries)
 # Single image tests for easy data
 runs=(
-"--source_prompt \"An black and white image of a man.\" --target_prompt \"A colorful image of a man. The man has black hair, and black eyes.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/celeba_degrads/color/celeba_men_selected/30.jpg"
+"--source_prompt \"A black and white image of a cheetah. The fur of the leopard is bright, with dark spots. The leopard has dark streaks running down from its dark eyes.\" --target_prompt \"A colored image of a cheetah. The fur of the leopard is golden yellow, with dark spots. The leopard has dark streaks running down from its dark eyes.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/color/cheetah_selected/flickr_wild_000557.jpg"
+# "--source_prompt \"An black and white image of a man.\" --target_prompt \"A colorful image of a man. The man has black hair, and black eyes.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/celeba_degrads/color/celeba_men_selected/30.jpg"
 # "--source_prompt \"A low resolution image of a cat into the camera. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --target_prompt \"A high resolution image of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --guidance 4 --inject 8 --ddnm_inject 1 --degradation \"super resolution\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/superres_8x/cat_selected/flickr_cat_000008.jpg"
 # "--source_prompt \"A black and white image of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --target_prompt \"A colorful of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1/flickr_cat_000008.jpg"
 # "--source_prompt \"A blurred image of a cat. The cat is white with black patches. The background is dark.\" --target_prompt \"A sharp image of a cat. The cat has white fur with black spots. Highly detailed, taken using a Canon EOS R camera, hyper detailed photo-realistic maximum detail.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"deblurring\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/deblur/cat_selected_1/flickr_cat_000008.jpg"
@@ -70,10 +71,10 @@ runs=(
 
 
 # Output directory base
-# OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_manyimgs"
+OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_manyimgs"
 # OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Denoise_ddnm_manyimgs"
 # OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Superres_pnp_flow"
-OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_celebA_trials"
+# OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Colorize_ddnm_celebA_trials"
 
 # Run each experiment
 for i in "${!runs[@]}"; do
