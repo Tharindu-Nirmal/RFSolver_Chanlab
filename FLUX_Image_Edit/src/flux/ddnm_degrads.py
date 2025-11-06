@@ -6,11 +6,11 @@ import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 
 # ------------- User Settings -------------------
-data_folder = "/scratch/gilbreth/lwickrem/data/celeba_gt/celeba_women_selected"       # Your input image folder
-output_folder = "/scratch/gilbreth/lwickrem/data/celeba_degrads/color/celeba_women_selected" # Where degraded images will be saved
+data_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_gt"       # Your input image folder
+output_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_degrads/denoise" # Where degraded images will be saved
 
 # Select degradation mode to create data
-IR_mode = "colorization"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
+IR_mode = "denoising"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
 
 # Used for super resolution
 scale = 4                
@@ -23,7 +23,7 @@ kernel_size  = 11       # odd number, e.g., 11/15/21
 wiener_lambda = 1e-1    # Tikhonov/Wiener regularizer for pinv(A); try 1e-4 .. 1e-2
 
 # Used when IR_mode == "denoising"
-sigma = 5             # noise level in [0,255] intensity units;
+sigma = 50             # noise level in [0,255] intensity units;
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # -----------------------------------------------

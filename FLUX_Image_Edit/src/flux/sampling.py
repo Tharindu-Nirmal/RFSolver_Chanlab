@@ -184,10 +184,10 @@ def denoise(
     t_log: list[float] = []
 
 
-    edit_count = 17 # last steps to do the edit
-    final_pad = 5 # last steps to skip ddnm
-    ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
-    # ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
+    edit_count = 15 # last steps to do the edit
+    final_pad = 3 # last steps to skip ddnm
+    # ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
+    ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
     # print('debug',ddnm_list)
 
     torch_device = torch.device(device)
@@ -217,12 +217,12 @@ def denoise(
     # )
     lambda_sched = make_lambda_step_schedule(
         timesteps=timesteps,  # after any reversal
-        start=0.35,           # start of activity
-        step=0.50,            # drop point to 0.5
-        end=0.90,             # end (exclusive)
-        level_hi=0.8,
-        level_lo=0.3,
-        final_pad=1
+        start=0.70,           # start of activity
+        step=0.80,            # drop point to 0.5
+        end=0.85,             # end (exclusive)
+        level_hi=0.5,
+        level_lo=0.2,
+        final_pad=4
     )
 
     # print("λ schedule:", [i for i in lambda_sched.tolist()])
@@ -287,8 +287,8 @@ def denoise(
         img_clean_hat = img - (t_curr * pred)
 
         #ddnm update in image space. y should be in image space.
-        # if (not(inverse) and (info['ddnm'])):
-        if (not(inverse) and (lambda_t > 0.0)):
+        if (not(inverse) and (info['ddnm'])):
+        # if (not(inverse) and (lambda_t > 0.0)):
             # decode
             img = unpack(img, height, width) #[B,C,H,W]
             img_clean_hat = unpack(img_clean_hat, height, width) #[B,C,H,W]

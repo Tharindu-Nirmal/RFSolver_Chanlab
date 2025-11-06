@@ -9,11 +9,11 @@ set -euo pipefail
 # ---------------------------------------------------------
 
 # Positional args (with sane fallbacks)
-INPUT_DIR="${1:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/leopard_selected}"   # degraded images (e.g., .../color/)
-GT_DIR="${2:-/scratch/gilbreth/lwickrem/data/afhq_gt/val/leopard_selected}"             # ground-truth images (RGB), same order
-OUTPUT_DIR="${3:-/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/color_ddnm_leopard_selected}"  # where to save outputs
-SOURCE_PROMPTS_TXT="${4:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/leopard_selected/source_prompts.txt}"
-TARGET_PROMPTS_TXT="${5:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/leopard_selected/target_prompts.txt}"
+INPUT_DIR="${1:-/scratch/gilbreth/lwickrem/data/LtF_test_degrads/denoise}"   # degraded images (e.g., .../denoise/)
+GT_DIR="${2:-/scratch/gilbreth/lwickrem/data/LtF_test_gt}"             # ground-truth images (RGB), same order
+OUTPUT_DIR="${3:-/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/denoise_noddnm_LtF_testin9}"  # where to save outputs
+SOURCE_PROMPTS_TXT="${4:-/scratch/gilbreth/lwickrem/data/LtF_test_degrads/denoise/source_prompts.txt}"
+TARGET_PROMPTS_TXT="${5:-/scratch/gilbreth/lwickrem/data/LtF_test_degrads/denoise/target_prompts.txt}"
 # SOURCE_IMG_PATH="${6:-/scratch/gilbreth/lwickrem/data/afhq_degrads/color/cat_selected_1/flickr_cat_000008.jpg}"
 
 # Script + common args
@@ -26,9 +26,9 @@ COMMON_ARGS=(--num_steps "$NUM_STEPS" --name "$NAME")
 # Hyperparameters (dataset-wide)
 # --------------------------------
 GUIDANCE=4
-INJECT=4
+INJECT=9
 DDNM_INJECT=1
-DEGRADATION="colorization"     # e.g., "colorization" | "super resolution" | "deblurring"| "denoising" | "old photo restoration" | "inpainting"
+DEGRADATION="denoising"     # e.g., "colorization" | "super resolution" | "deblurring"| "denoising" | "old photo restoration" | "inpainting"
 
 # --------------------------------
 # Batch options
