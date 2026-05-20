@@ -217,11 +217,11 @@ def denoise(
     # )
     lambda_sched = make_lambda_step_schedule(
         timesteps=timesteps,  # after any reversal
-        start=0.70,           # start of activity
-        step=0.80,            # drop point to 0.5
-        end=0.85,             # end (exclusive)
-        level_hi=0.5,
-        level_lo=0.2,
+        start=0.60,           # start of activity
+        step=0.61,            # drop point to 0.5
+        end=0.61,             # end (exclusive)
+        level_hi=0.2,
+        level_lo=0.1,
         final_pad=4
     )
 
@@ -287,9 +287,10 @@ def denoise(
         img_clean_hat = img - (t_curr * pred)
 
         #ddnm update in image space. y should be in image space.
-        if (not(inverse) and (info['ddnm'])):
-        # if (not(inverse) and (lambda_t > 0.0)):
+        # if (not(inverse) and (info['ddnm'])):
+        if (not(inverse) and (lambda_t > 0.0)):
             # decode
+            print(f"Performing DDNM update at step {i} with t={info['t']:.4f}")
             img = unpack(img, height, width) #[B,C,H,W]
             img_clean_hat = unpack(img_clean_hat, height, width) #[B,C,H,W]
             vt = unpack(pred, height, width) #[B,C,H,W]

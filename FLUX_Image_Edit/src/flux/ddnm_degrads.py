@@ -7,15 +7,15 @@ import torchvision.transforms.functional as TF
 
 # ------------- User Settings -------------------
 data_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_gt"       # Your input image folder
-output_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_degrads/denoise" # Where degraded images will be saved
+output_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_degrads/superres_16x" # Where degraded images will be saved
 
 # Select degradation mode to create data
-IR_mode = "denoising"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
+IR_mode = "super resolution"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
 
 # Used for super resolution
-scale = 4                
-scale_h = 4
-scale_w = 4
+scale = 8                
+scale_h = 8
+scale_w = 8
 
 # Used when IR_mode == "deblurring"
 blur_sigma   = 2      # std dev of Gaussian PSF (in pixels)
