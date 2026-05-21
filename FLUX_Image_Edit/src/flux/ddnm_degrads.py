@@ -211,24 +211,14 @@ def ddnm_simple(xt, y, z, t, lambda_t=1, IR_mode="super resolution"):
 # https://github.com/wyhuai/DDNM
 
     x0t = xt
-    # x0t = (xt - (t)*z)/ ((1-t) + 1e-10)
 
     A = set_operator(x0t.shape, IR_mode)
-    Ap = set_pinv_operator(x0t.shape, IR_mode)
-
-    # x0t= x0t + lambda_t*Ap(y - A(x0t))
-    # Seaprate lines for debugging:  
-    # print(f"DDNM step input: x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}; y min={y.min().item():.4f}, max={y.max().item():.4f}")    
+    Ap = set_pinv_operator(x0t.shape, IR_mode)   
     
     y0_hat = A(x0t)
     yres = y - y0_hat
     xres = Ap(yres)
-    DDNM_x0t= x0t + lambda_t*xres
-    # print(f"DDNM step: y0_hat min={y0_hat.min().item():.4f}, max={y0_hat.max().item():.4f}; yres min={yres.min().item():.4f}, max={yres.max().item():.4f}; xres min={xres.min().item():.4f}, max={xres.max().item():.4f}, x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}")
-    # x0t = torch.clamp(x0t, 0, 255)
-
-    DDNM_xt = DDNM_x0t
-    # DDNM_xt = (t)*z + (1-t)*DDNM_x0t
+    DDNM_xt= x0t + lambda_t*xres
     
     return DDNM_xt
 
@@ -236,24 +226,18 @@ def ddnm_flow(x0, y, v, t, lambda_t=1, IR_mode="super resolution"):
     """
     v is the velocity at time t, x0 is the estimate for x0 (the clean image estimate given xt)
     """
-# Refer: PNP flow https://arxiv.org/pdf/2410.02423
+    # Refer: PNP flow https://arxiv.org/pdf/2410.02423
 
     # Expected value of x0, given xt
     x0t = x0
 
     A = set_operator(x0t.shape, IR_mode)
-    Ap = set_pinv_operator(x0t.shape, IR_mode)
-
-    # x0t= x0t + lambda_t*Ap(y - A(x0t))
-    # Seaprate lines for debugging:  
-    # print(f"DDNM step input: x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}; y min={y.min().item():.4f}, max={y.max().item():.4f}")    
+    Ap = set_pinv_operator(x0t.shape, IR_mode)   
     
     y0_hat = A(x0t)
     yres = y - y0_hat
     xres = Ap(yres)
     DDNM_x0t= x0t + lambda_t*xres
-    # print(f"DDNM step: y0_hat min={y0_hat.min().item():.4f}, max={y0_hat.max().item():.4f}; yres min={yres.min().item():.4f}, max={yres.max().item():.4f}; xres min={xres.min().item():.4f}, max={xres.max().item():.4f}, x0t min={x0t.min().item():.4f}, max={x0t.max().item():.4f}")
-    # x0t = torch.clamp(x0t, 0, 255)
 
     # DDNM_xt = DDNM_x0t
     DDNM_xt = DDNM_x0t + t*v

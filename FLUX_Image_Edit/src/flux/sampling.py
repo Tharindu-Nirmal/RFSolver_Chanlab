@@ -10,7 +10,6 @@ from .model import Flux
 from .modules.conditioner import HFEmbedder
 
 from .ddnm_degrads import ddnm_simple
-from .ddnm_degrads import ddnm_flow
 from .lambda_schdules import make_lambda_schedule, make_lambda_ramp_schedule, make_lambda_step_schedule
 from .util import (load_ae)
 from PIL import Image, ImageDraw, ImageFont
@@ -205,16 +204,6 @@ def denoise(
         ddnm_list = ddnm_list[::-1]
 
     #Building the lambda schedule regardless if inverse or not.
-    # lambda_sched = make_lambda_schedule(timesteps=timesteps,
-    #     tail_frac=0.50,      # last 15% of steps carry nonzeros
-    #     peak_at=0.50,        # try 0.88–0.95
-    #     rise_smooth=20.0,    # gentler/longer rise
-    #     drop_sharp=5.0,     # sharp fall
-    #     pre_peak_atten=0.8,  # stronger attenuation before peak
-    #     power=0.9,           # slightly narrower peak
-    #     floor=0.0,           # or small e.g. 0.02
-    #     final_pad=2         # keep your 2-step pad
-    # )
     lambda_sched = make_lambda_step_schedule(
         timesteps=timesteps,  # after any reversal
         start=0.60,           # start of activity
@@ -224,9 +213,6 @@ def denoise(
         level_lo=0.1,
         final_pad=4
     )
-
-    # print("λ schedule:", [i for i in lambda_sched.tolist()])
-    # print("peak idx:", int(torch.argmax(lambda_sched).item()), "peak val:", float(lambda_sched.max().item()))
 
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
@@ -287,7 +273,6 @@ def denoise(
         img_clean_hat = img - (t_curr * pred)
 
         #ddnm update in image space. y should be in image space.
-        # if (not(inverse) and (info['ddnm'])):
         if (not(inverse) and (lambda_t > 0.0)):
             # decode
             print(f"Performing DDNM update at step {i} with t={info['t']:.4f}")
@@ -300,24 +285,10 @@ def denoise(
                 img_clean_hat = ae.decode(img_clean_hat)
                 vt = ae.decode(vt)
             
-            # # Debugging: Save the image as of this point
-            # # # bring into PIL format and save
-            # x = img.clamp(-1, 1)
-            # x = rearrange(x[0], "c h w -> h w c")
-            # img_x = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())
-            # img_x.save('test_ddnm_timestep%d.png'%(i), quality=95, subsampling=0)
-            # # assert 1==0
-
-            # print(f"img Tensor range: min={img.min().item():.4f}, max={img.max().item():.4f}")
-            # print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
 
             t = info['t']
-            # print('time t=',t)
-            # print('vt:',vt.shape,' img_clean_hat:', img_clean_hat.shape)
 
             img = ddnm_simple(img, y, z, t, lambda_t=lambda_t, IR_mode=degradation_type) # both y and img are in [B,C,H,W]
-
-            # img = ddnm_flow(img_clean_hat, y, vt, t, lambda_t=lambda_t, IR_mode=degradation_type) # both y and img_clean_hat are in [B,C,H,W]
 
             # The only relevant part from the encode() function
             img = ae.encode(img.to()).to(torch.bfloat16)
@@ -333,9 +304,6 @@ def denoise(
         
         # bring into PIL format and save
         x_debug = tensor_chw_neg1to1_to_pil(img_debug[0])
-        # if (not inverse):
-        #     # save the the images from noise-> img path separately
-        #     x_debug.save('test_itr%.2d.png'%(i), quality=95, subsampling=0)
         frames.append(x_debug)
         labels.append(f"itr{i}_t={info['t']}")
 

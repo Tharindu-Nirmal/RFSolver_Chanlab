@@ -235,14 +235,6 @@ class SingleStreamBlock(nn.Module):
         q, k, v = rearrange(qkv, "B L (K H D) -> K B H L D", K=3, H=self.num_heads)
         q, k = self.norm(q, k, v)
 
-        # Note: If the memory of your device is not enough, you may consider uncomment the following code.
-        # if info['inject'] and info['id'] > 19:
-        #     store_path = os.path.join(info['feature_path'], str(info['t']) + '_' + str(info['second_order']) + '_' + str(info['id']) + '_' + info['type'] + '_' + 'V' + '.pth')
-        #     if info['inverse']:
-        #         torch.save(v, store_path)
-        #     if not info['inverse']:
-        #         v = torch.load(store_path, weights_only=True)
-
         # Save the features in the memory if inverse. Else(when going from noise to image), load the features from the memory.
         # There are 38 single blocks in the DiT model. info[id] is the index of the block.
 

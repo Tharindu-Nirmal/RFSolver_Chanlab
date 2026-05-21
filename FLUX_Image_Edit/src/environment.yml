@@ -1,0 +1,6 @@
+name: /depot/chan129/users/tharindu/virtual_envs/rfsolver_tw
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+prefix: /depot/chan129/users/tharindu/virtual_envs/rfsolver_tw
