@@ -12,10 +12,16 @@ output_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_degrads/superres_16x" 
 # Select degradation mode to create data
 IR_mode = "super resolution"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
 
-# Used for super resolution
-scale = 8                
-scale_h = 8
-scale_w = 8
+# Used for super resolution. Change these here and edit_image.py will stay in sync.
+scale_h = 4
+scale_w = 4
+
+
+def get_super_resolution_scales(height=None, width=None):
+    sr_scale_h, sr_scale_w = scale_h, scale_w
+    if height is not None and width is not None and height >= width:
+        sr_scale_h, sr_scale_w = sr_scale_w, sr_scale_h
+    return sr_scale_h, sr_scale_w
 
 # Used when IR_mode == "deblurring"
 blur_sigma   = 2      # std dev of Gaussian PSF (in pixels)
@@ -105,7 +111,8 @@ def set_operator(img_shape, IR_mode):
 
     elif IR_mode == "super resolution":
         _, _, h, w = img_shape
-        down = torch.nn.AdaptiveAvgPool2d((h // scale, w // scale))
+        sr_scale_h, sr_scale_w = get_super_resolution_scales(h, w)
+        down = torch.nn.AdaptiveAvgPool2d((h // sr_scale_h, w // sr_scale_w))
         # #maintain input image size
         # up = torch.nn.Upsample(size=(h, w), mode="bilinear", align_corners=False)
         return lambda z: down(z)
@@ -143,7 +150,8 @@ def set_operator(img_shape, IR_mode):
         mask[:, :, h//4:h*3//4, w//4:w*3//4] = 0
         A1 = lambda z: z * mask
         A2 = color2gray
-        A3 = torch.nn.AdaptiveAvgPool2d((h // scale, w // scale))
+        sr_scale_h, sr_scale_w = get_super_resolution_scales(h, w)
+        A3 = torch.nn.AdaptiveAvgPool2d((h // sr_scale_h, w // sr_scale_w))
         return lambda z: A3(A2(A1(z)))
 
     else:
@@ -162,7 +170,8 @@ def set_pinv_operator(img_shape, IR_mode):
 
     elif IR_mode == "super resolution":
         # The input to Ap is the downsampled image, so we upsample with PatchUpsample
-        return lambda z: PatchUpsample(z, scale)
+        sr_scale_h, sr_scale_w = get_super_resolution_scales(h, w)
+        return lambda z: PatchUpsampleEmbeds(z, sr_scale_h, sr_scale_w)
     
     elif IR_mode == "super resolution embeds":
         # The input to Ap is the downsampled image, so we upsample with PatchUpsample
@@ -192,11 +201,12 @@ def set_pinv_operator(img_shape, IR_mode):
         return A_pinv_blur
 
     elif IR_mode == "old photo restoration":
+        sr_scale_h, sr_scale_w = get_super_resolution_scales(h, w)
         mask = torch.ones(img_shape, device=device)
         mask[:, :, h//4:h*3//4, w//4:w*3//4] = 0
         A1p = lambda z: z * mask
         A2p = gray2color
-        A3p = lambda z: PatchUpsample(z, scale)
+        A3p = lambda z: PatchUpsampleEmbeds(z, sr_scale_h, sr_scale_w)
         return lambda z: A1p(A2p(A3p(z)))
 
     else:
@@ -283,7 +293,8 @@ if __name__ == "__main__":
             y_lr_img.save(os.path.join(original_y_folder, fname))
 
             # then upsample so FLUX can handle the size
-            degraded = PatchUpsample(degraded, scale)
+            sr_scale_h, sr_scale_w = get_super_resolution_scales(img_tensor.shape[2], img_tensor.shape[3])
+            degraded = PatchUpsampleEmbeds(degraded, sr_scale_h, sr_scale_w)
 
         # Save the (possibly upsampled) degraded image to output_folder
         degraded_img = TF.to_pil_image(torch.clamp(degraded.squeeze(0), 0, 1).cpu())

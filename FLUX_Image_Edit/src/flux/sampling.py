@@ -197,12 +197,12 @@ def denoise(
     #Building the lambda schedule regardless if inverse or not.
     lambda_sched = make_lambda_step_schedule(
         timesteps=timesteps,  # after any reversal
-        start=0.60,           # start of activity
-        step=0.61,            # drop point to 0.5
-        end=0.61,             # end (exclusive)
-        level_hi=0.2,
-        level_lo=0.1,
-        final_pad=4
+        start=0.50,           # start of activity
+        step=0.70,            # drop point to 0.5
+        end=0.85,             # end (exclusive)
+        level_hi=1,
+        level_lo=0.5,
+        final_pad=3
     )
 
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)

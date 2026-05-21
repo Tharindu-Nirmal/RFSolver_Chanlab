@@ -10,6 +10,7 @@ from fire import Fire
 from PIL import ExifTags, Image
 
 from flux.sampling import denoise, get_schedule, prepare, unpack
+from flux.ddnm_degrads import get_super_resolution_scales
 from flux.util import (configs, embed_watermark, load_ae, load_clip,
                        load_flow_model, load_t5)
 from transformers import pipeline
@@ -114,17 +115,13 @@ def main(
     #====================edits start==============
     # Scales for average pooling
     print('init_image shape:',init_image.shape) # [320,480,3]
-    scale_h = 8
-    scale_w = 8
-    if height >= width:
-        scale_h,scale_w = scale_w,scale_h # swap if height is greater than width
-
     #Creating y tensor to repeatedly be used in sampling.py-->ddnm_simple
     y = torch.from_numpy(init_image).float().unsqueeze(0) / 127.5 - 1 # [1,320,480,3] and normalise as done in encode()
     B,H,W,C = y.shape
     
     # If the degradation type by nature downsizes the image, we need to do it. The dataset is assumed to be in the same size as the init_image.
     if degradation_type == "super resolution":
+        scale_h, scale_w = get_super_resolution_scales(H, W)
         assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
         y = rearrange(y, 'b (h s1) (w s2) c-> b c h w s1 s2', s1=scale_h, s2=scale_w)
         y = y.mean(dim=(-1, -2))  # [1, 3, 80, 120]
@@ -177,7 +174,6 @@ def main(
         info['feature_path'] = args.feature_path
         info['feature'] = {}
         info['inject_step'] = args.inject
-        info['ddnm_step'] = args.ddnm_inject
         if not os.path.exists(args.feature_path):
             os.mkdir(args.feature_path)
 
