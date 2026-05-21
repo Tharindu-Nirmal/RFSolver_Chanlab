@@ -175,19 +175,11 @@ def denoise(
     inject_list = [True] * info['inject_step'] + [False] * (len(timesteps[:-1]) - info['inject_step'])
 
     # edits for ddnm update: The order here is for going from noise to image.
-    # ddnm_list = [True] * info['ddnm_step'] + [False] * (len(timesteps[:-1]) - info['ddnm_step'])
-    # ddnm_list = [False] * (len(timesteps[:-1]) - info['ddnm_step']) + [True] * info['ddnm_step']
-    # print('debug',len(timesteps[:-1])) #30 or 300
-
     lambda_log: list[float] = []
     t_log: list[float] = []
 
-
     edit_count = 15 # last steps to do the edit
     final_pad = 3 # last steps to skip ddnm
-    # ddnm_list =  [False]*(len(timesteps[:-1]) - edit_count) + [True]*(edit_count-final_pad) + [False]*(final_pad) 
-    ddnm_list =  [False]*(len(timesteps[:-1]))  #No DDNM update
-    # print('debug',ddnm_list)
 
     torch_device = torch.device(device)
     ae = load_ae(name, device="cpu" if offload else torch_device)
@@ -201,7 +193,6 @@ def denoise(
     if inverse:
         timesteps = timesteps[::-1]
         inject_list = inject_list[::-1]
-        ddnm_list = ddnm_list[::-1]
 
     #Building the lambda schedule regardless if inverse or not.
     lambda_sched = make_lambda_step_schedule(
@@ -225,7 +216,6 @@ def denoise(
         info['inverse'] = inverse
         info['second_order'] = False
         info['inject'] = inject_list[i]
-        info['ddnm'] = ddnm_list[i]
         lambda_t = float(lambda_sched[i].item())
         info['lambda_t'] = lambda_t
         lambda_log.append(lambda_t)

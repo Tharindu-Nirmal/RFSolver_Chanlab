@@ -18,9 +18,6 @@ import numpy as np
 
 import os
 
-# Sanity check if "cleaning up" is possible
-# from diffusers import StableDiffusionXLImg2ImgPipeline
-
 NSFW_THRESHOLD = 0.85
 
 @dataclass
@@ -143,20 +140,6 @@ def main(
 
     #Convert the numpy image array into latent space tensor. init_image is used both in inversion and reconstruction
     init_image = encode(init_image, torch_device, ae) # [1, 16, 40, 60]
-
-
-    # #Creating y_enc: An encoded version of the degraded image in latent space. (Didnt have a big improvement before)
-    # #used in inversion. sampling.py-->ddnm_simple
-    # y_enc = init_image # [1, 16, 40, 60]
-    # B,C,H,W = y_enc.shape
-    # assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
-
-    # #Average pooling
-    # y_enc = rearrange(y_enc, 'b c (h s1) (w s2) -> b c h w s1 s2', s1=scale_h, s2=scale_w)
-    # y_enc = y_enc.mean(dim=(-1, -2))  # [1, 16, 10, 15]
-    # #didnt rescale the image, or move y_enc to torch_deivce, because enode already does it.
-    # # print('y_enc shape:', y_enc.shape)
-    # # print(f"y_enc Tensor range: min={y_enc.min().item():.4f}, max={y_enc.max().item():.4f}")
     
 
     #=======================edits end===============
@@ -258,30 +241,6 @@ def main(
             x = rearrange(x[0], "c h w -> h w c")
 
             img = Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy()) #[0,255]
-
-            # # Edits start: Use SD to "clean up" the image
-            # pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0",torch_dtype=torch.float16,).to(torch_device)
-            # pipe.enable_model_cpu_offload()  # memory-friendly; or use .to(device) only
-
-            # # flow_output which is in PIL format is sent as input to SD
-            # flow_out_pil = img # shape (H,W,3), dtype=uint8
-
-            # prompt = "photo-realistic, clean details, sharp edges, natural colors"
-            # negative_prompt = "blur, artifacts, oversharpening, waxy skin, banding"
-
-            # # SDEdit refinement: strength≈0.2–0.35 is usually subtle/nice for polishing
-            # result = pipe(
-            #     prompt=prompt,
-            #     negative_prompt=negative_prompt,
-            #     image=flow_out_pil,
-            #     strength=0.17,            # how far back in the noise schedule to jump
-            #     guidance_scale=2.0,         # keep moderate to avoid content drift
-            #     num_inference_steps=10,     # 20–40 is common for refinement
-            #     generator=torch.Generator(device).manual_seed(42),
-            # )
-            # refined = result.images[0]
-            # refined.save("refined_sdedit.png")
-            # # Edit ends: Use SD to "clean up" the image
 
             nsfw_score = [x["score"] for x in nsfw_classifier(img) if x["label"] == "nsfw"][0]
             
