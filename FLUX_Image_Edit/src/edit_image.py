@@ -21,6 +21,18 @@ import os
 
 NSFW_THRESHOLD = 0.85
 
+def _lambda_schedule_overrides(args):
+    overrides = {
+        "start": args.lambda_start,
+        "step": args.lambda_step,
+        "end": args.lambda_end,
+        "level_hi": args.lambda_level_hi,
+        "level_lo": args.lambda_level_lo,
+        "final_pad": args.lambda_final_pad,
+    }
+    return {key: value for key, value in overrides.items() if value is not None}
+
+
 @dataclass
 class SamplingOptions:
     source_prompt: str
@@ -174,6 +186,7 @@ def main(
         info['feature_path'] = args.feature_path
         info['feature'] = {}
         info['inject_step'] = args.inject
+        info['lambda_schedule_overrides'] = _lambda_schedule_overrides(args)
         if not os.path.exists(args.feature_path):
             os.mkdir(args.feature_path)
 
@@ -285,6 +298,18 @@ if __name__ == "__main__":
     parser.add_argument('--offload', action='store_true', help='set it to True if the memory of GPU is not enough')
     parser.add_argument('--degradation', type=str, default='super resolution',
                         help='degradation mode: super resolution, colorization, old photo restoration, inpainting')
+    parser.add_argument('--lambda_start', type=float, default=None,
+                        help='override the degradation default lambda schedule start fraction')
+    parser.add_argument('--lambda_step', type=float, default=None,
+                        help='override the degradation default lambda schedule step/drop fraction')
+    parser.add_argument('--lambda_end', type=float, default=None,
+                        help='override the degradation default lambda schedule end fraction')
+    parser.add_argument('--lambda_level_hi', type=float, default=None,
+                        help='override the degradation default lambda schedule high level')
+    parser.add_argument('--lambda_level_lo', type=float, default=None,
+                        help='override the degradation default lambda schedule low level')
+    parser.add_argument('--lambda_final_pad', type=int, default=None,
+                        help='override the degradation default number of final lambda-zero steps')
 
     args = parser.parse_args()
 

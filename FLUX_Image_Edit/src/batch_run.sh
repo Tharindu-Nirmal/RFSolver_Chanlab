@@ -4,54 +4,17 @@
 PYTHON_SCRIPT="edit_image.py"
 COMMON_ARGS="--num_steps 30 --name 'flux-dev' --offload"
 
-# Define runs as individual strings (no line breaks inside array entries)
-# Single image tests for easy data
-# runs=(
-# "--source_prompt \"A low resolution of a cheetah. The fur of the leopard is bright, with dark spots. The leopard has dark streaks running down from its dark eyes.\" --target_prompt \"A high resolution image of a cheetah. The fur of the leopard is golden yellow, with dark spots. The leopard has dark streaks running down from its dark eyes.\" --guidance 4 --inject 5 --ddnm_inject 1 --degradation \"super resolution\" --source_img_dir /scratch/gilbreth/lwickrem/data/LtF_test_degrads/superres_4x/pixabay_wild_000106.jpg"
-# "--source_prompt \"An black and white image of a man.\" --target_prompt \"A colorful image of a man. The man has black hair, and black eyes.\" --guidance 4 --inject 4 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/celeba_degrads/color/celeba_men_selected/30.jpg"
-# "--source_prompt \"A low resolution image of a cat into the camera. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --target_prompt \"A high resolution image of a cat. The cat is white with black patches. The background is dark The nose of the cat is pink. The eyes of the cat are green.\" --guidance 4 --inject 8 --ddnm_inject 1 --degradation \"super resolution\" --source_img_dir /scratch/gilbreth/lwickrem/data/afhq_degrads/superres_8x/cat_selected/flickr_cat_000008.jpg"
-# )
-
-
-# 4x superres
+# Runs one image for each type of degradation. Edit these to run different images or change the prompts, guidance, inject, etc. parameters. The source image is specified in the --source_img_dir argument. The output will be saved in the directory specified by --output_dir, with a subdirectory for each run.  
 runs=(
-"--source_prompt \"A low resolution of a cheetah. There are blocking artifacts on the image. \" --target_prompt \"A high resolution image of a cheetah. There are no blocking artifacts on the image. The image is smooth, and photorealistic. \" --guidance 4 --inject 5 --ddnm_inject 1 --degradation \"super resolution\" --source_img_dir /scratch/gilbreth/lwickrem/data/LtF_test_degrads/superres_4x/pixabay_wild_000106.jpg"
+"--source_prompt \"A low resolution of a cheetah. There are blocking artifacts on the image. \" --target_prompt \"A high resolution image of a cheetah. There are no blocking artifacts on the image. The image is smooth, and photorealistic. \" --degradation \"super resolution\" --guidance 4 --inject 5 --lambda_start 0.50 --lambda_step 0.70 --lambda_end 0.85 --lambda_level_hi 1.0 --lambda_level_lo 0.5 --lambda_final_pad 3 --source_img_dir /scratch/gilbreth/lwickrem/data/LtF_test_degrads/superres_4x/pixabay_wild_000106.jpg"
+"--source_prompt \"A black and white image of a cheetah. The fur of the cheetah is bright, with dark spots. The cheetah has dark streaks running down from his dark eyes.\" --target_prompt \"A colored image of a cheetah. The fur of the cheetah is golden yellow, with dark spots. The cheetah has dark streaks running down from his dark eyes.\" --degradation \"colorization\" --guidance 4 --inject 5 --lambda_start 0.40 --lambda_step 0.50 --lambda_end 0.95 --lambda_level_hi 1.0 --lambda_level_lo 0.8 --lambda_final_pad 1 --source_img_dir /scratch/gilbreth/lwickrem/data/LtF_test_degrads/color/pixabay_wild_000106.jpg"
+"--source_prompt \"A noisy image of a cheetah. The fur of the cheetah is bright, with dark spots. The cheetah has dark streaks running down from his dark eyes.\" --target_prompt \"A clean, noise free image of a cheetah. The fur of the cheetah is bright, with dark spots. The cheetah has dark streaks running down from his dark eyes. Highly detailed, taken using a Canon EOS R camera, hyper detailed photo-realistic maximum detail. There are no noise artifacts.\" --degradation \"denoising\" --guidance 4 --inject 5 --lambda_start 0.50 --lambda_step 0.75 --lambda_end 0.95 --lambda_level_hi 1.0 --lambda_level_lo 0.5 --lambda_final_pad 2 --source_img_dir /scratch/gilbreth/lwickrem/data/LtF_test_degrads/denoise/pixabay_wild_000106.jpg"
+"--source_prompt \"A blurred image of a cheetah. The fur of the cheetah is bright, with dark spots. The cheetah has dark streaks running down from his dark eyes.\" --target_prompt \"A sharp image of a cheetah. The fur of the cheetah is bright, with dark spots. The cheetah has dark streaks running down from his dark eyes. Highly detailed, taken using a Canon EOS R camera, hyper detailed photo-realistic maximum detail.\" --degradation \"deblurring\" --guidance 4 --inject 5 --lambda_start 0.70 --lambda_step 0.80 --lambda_end 0.90 --lambda_level_hi 1.0 --lambda_level_lo 0.3 --lambda_final_pad 3 --source_img_dir /scratch/gilbreth/lwickrem/data/LtF_test_degrads/deblur/pixabay_wild_000106.jpg"
 )
 
 
-# For paper images
-# runs=(
-#   "--source_prompt \"A black and white image of a tiger. The tiger has fur with white and black streaks. The eyes of the tiger are dark. \" --target_prompt \"A colorful image of a tiger. The tiger has orange-golden fur with white and black streaks. The eyes of the tiger are dark orange.\" --guidance 2 --inject 10 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/LtF_test_degrads/color/flickr_wild_002809.jpg"
-# )
-
-
-# Single image tests for hard data
-# runs=(
-# "--source_prompt \"A black and white image of a leopard.\" --target_prompt \"A colorful image of a leopard. The tree is brown, with green leaves. The sky in the background is blue.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/134049.jpg"
-# )
-
-
-
-# group runs for super-resolution
-# runs=(
-# "--source_prompt \"\" --target_prompt \"\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
-# )
-
-# "--source_prompt \"A low resolution image\" --target_prompt \"A high resolution image.\" --guidance 4 --inject 8 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/107.png"
-
-# "--source_prompt \"low resolution image\" --target_prompt \"A high resolution image.\" --guidance 2 --inject 10 --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/superres/130014.jpg"
-# )
-
-
-
-# group runs for colorization
-# runs=(
-# "--source_prompt \"A black and white image of cars parked near a walkway.\" --target_prompt \"A colorful image of cars parked near a walkway. The cars are white. The walkway is grey.\" --guidance 4 --inject 12 --ddnm_inject 1 --degradation \"colorization\" --source_img_dir /scratch/gilbreth/lwickrem/data/HandpickedDegrads/colorization/107.png"
-# )
-
-
 # Output directory base
-OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Cleancheck/Superres4x"
+OUTPUT_BASE="/scratch/gilbreth/lwickrem/RF_Inversion/RF-Solver-Edit/FLUX_Image_Edit/results/Cleancheck/alldegrads_cheetah"
 
 
 # Run each experiment

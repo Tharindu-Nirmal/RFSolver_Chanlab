@@ -10,7 +10,7 @@ data_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_gt"       # Your input i
 output_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_degrads/superres_16x" # Where degraded images will be saved
 
 # Select degradation mode to create data
-IR_mode = "super resolution"  # Options: "colorization", "inpainting", "super resolution", "super resolution embeds", "denoising", "deblurring", "old photo restoration"
+IR_mode = "super resolution"  # Options: "colorization", "super resolution", "denoising", "deblurring"
 
 # Used for super resolution. Change these here and edit_image.py will stay in sync.
 scale_h = 4
@@ -22,6 +22,36 @@ def get_super_resolution_scales(height=None, width=None):
     if height is not None and width is not None and height >= width:
         sr_scale_h, sr_scale_w = sr_scale_w, sr_scale_h
     return sr_scale_h, sr_scale_w
+
+
+# Degradation-specific lambda schedule defaults used by sampling.py.
+# start/step/end can be fractions of the denoising loop, where 0 is the first
+# step and 1 is the last step.
+DEFAULT_LAMBDA_SCHEDULE = {
+    "kind": "step",
+    "start": 0.50,
+    "step": 0.70,
+    "end": 0.85,
+    "level_hi": 1.0,
+    "level_lo": 0.5,
+    "final_pad": 3,
+}
+
+LAMBDA_SCHEDULES = {
+    "super resolution": dict(DEFAULT_LAMBDA_SCHEDULE),
+    "colorization": dict(DEFAULT_LAMBDA_SCHEDULE),
+    "inpainting": dict(DEFAULT_LAMBDA_SCHEDULE),
+    "denoising": dict(DEFAULT_LAMBDA_SCHEDULE),
+    "deblurring": dict(DEFAULT_LAMBDA_SCHEDULE),
+    "old photo restoration": dict(DEFAULT_LAMBDA_SCHEDULE),
+}
+
+
+def get_lambda_schedule_config(IR_mode, overrides=None):
+    config = dict(LAMBDA_SCHEDULES.get(IR_mode, DEFAULT_LAMBDA_SCHEDULE))
+    if overrides:
+        config.update({key: value for key, value in overrides.items() if value is not None})
+    return config
 
 # Used when IR_mode == "deblurring"
 blur_sigma   = 2      # std dev of Gaussian PSF (in pixels)

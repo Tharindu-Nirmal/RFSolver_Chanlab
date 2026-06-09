@@ -9,7 +9,7 @@ from torch import Tensor
 from .model import Flux
 from .modules.conditioner import HFEmbedder
 
-from .ddnm_degrads import ddnm_simple
+from .ddnm_degrads import ddnm_simple, get_lambda_schedule_config
 from .lambda_schdules import make_lambda_schedule, make_lambda_ramp_schedule, make_lambda_step_schedule
 from .util import (load_ae)
 from PIL import Image, ImageDraw, ImageFont
@@ -148,6 +148,20 @@ def save_image_grid_with_labels(images, labels, out_path, cols=6, pad=8, caption
     canvas.save(out_path, quality=95, subsampling=0)
 
 
+def make_degradation_lambda_schedule(timesteps, degradation_type, overrides=None):
+    schedule_config = get_lambda_schedule_config(degradation_type, overrides)
+    schedule_kind = schedule_config.pop("kind", "step")
+
+    if schedule_kind == "step":
+        return make_lambda_step_schedule(timesteps=timesteps, **schedule_config)
+    if schedule_kind == "ramp":
+        return make_lambda_ramp_schedule(timesteps=timesteps, **schedule_config)
+    if schedule_kind == "beta":
+        return make_lambda_schedule(timesteps=timesteps, **schedule_config)
+
+    raise ValueError(f"Unknown lambda schedule kind: {schedule_kind}")
+
+
 def denoise(
     model: Flux,
     # model input
@@ -194,15 +208,10 @@ def denoise(
         timesteps = timesteps[::-1]
         inject_list = inject_list[::-1]
 
-    #Building the lambda schedule regardless if inverse or not.
-    lambda_sched = make_lambda_step_schedule(
-        timesteps=timesteps,  # after any reversal
-        start=0.50,           # start of activity
-        step=0.70,            # drop point to 0.5
-        end=0.85,             # end (exclusive)
-        level_hi=1,
-        level_lo=0.5,
-        final_pad=3
+    lambda_sched = make_degradation_lambda_schedule(
+        timesteps,
+        degradation_type,
+        overrides=info.get("lambda_schedule_overrides"),
     )
 
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
@@ -327,6 +336,5 @@ def denoise(
         print('Schedule plot failed:', e)
 
     return img, info
-
 
 
