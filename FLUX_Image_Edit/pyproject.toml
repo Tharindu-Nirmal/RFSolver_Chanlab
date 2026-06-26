@@ -1,9 +1,9 @@
 [project]
-name = "RF-Solver-Editing"
+name = "FlowSteer"
 authors = [
-  { name = "Jiangshan Wang, Junfu Pu, et al.", email = "wjs23@mails.tsinghua.edu.cn" },
+  { name = "Tharindu Wickremasinghe, Chenyang Qi, Harshana Weligampola, Zhengzhong Tu, Stanley H. Chan" },
 ]
-description = "Inference codebase for RF-Solver-Editing"
+description = "FlowSteer: Conditioning Flow Field for Consistent Image Restoration (CVPR 2025)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE.md" }
@@ -36,8 +36,6 @@ all = [
   "flux[gradio]",
 ]
 
-[project.scripts]
-flux = "flux.edit:main"
 
 [build-system]
 build-backend = "setuptools.build_meta"

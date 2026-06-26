@@ -125,27 +125,20 @@ def main(
     height, width, c = init_image.shape
 
     #====================edits start==============
-    # Scales for average pooling
-    print('init_image shape:',init_image.shape) # [320,480,3]
-    #Creating y tensor to repeatedly be used in sampling.py-->ddnm_simple
-    y = torch.from_numpy(init_image).float().unsqueeze(0) / 127.5 - 1 # [1,320,480,3] and normalise as done in encode()
+    y = torch.from_numpy(init_image).float().unsqueeze(0) / 127.5 - 1
     B,H,W,C = y.shape
-    
+
     # If the degradation type by nature downsizes the image, we need to do it. The dataset is assumed to be in the same size as the init_image.
     if degradation_type == "super resolution":
         scale_h, scale_w = get_super_resolution_scales(H, W)
         assert H % scale_h == 0 and W % scale_w == 0 #Height and Width must be divisible by scale
         y = rearrange(y, 'b (h s1) (w s2) c-> b c h w s1 s2', s1=scale_h, s2=scale_w)
-        y = y.mean(dim=(-1, -2))  # [1, 3, 80, 120]
-    
+        y = y.mean(dim=(-1, -2))
+
     else:
-        y = rearrange(y, 'b h w c-> b c h w') # [1, 3, 80, 120]
+        y = rearrange(y, 'b h w c-> b c h w')
 
     y = y.to(torch_device)
-    print('y shape:', y.shape)
-    print(f"y Tensor range: min={y.min().item():.4f}, max={y.max().item():.4f}")
-    
-    print('init_image to flux shape:',init_image.shape) # [320,480,3]
 
     #Convert the numpy image array into latent space tensor. init_image is used both in inversion and reconstruction
     init_image = encode(init_image, torch_device, ae) # [1, 16, 40, 60]

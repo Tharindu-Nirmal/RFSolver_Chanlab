@@ -5,11 +5,7 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 
-# ------------- User Settings -------------------
-data_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_gt"       # Your input image folder
-output_folder = "/scratch/gilbreth/lwickrem/data/LtF_test_degrads/superres_16x" # Where degraded images will be saved
-
-# Select degradation mode to create data
+# ------------- Degradation mode default -------------------
 IR_mode = "super resolution"  # Options: "colorization", "super resolution", "denoising", "deblurring"
 
 # Used for super resolution. Change these here and edit_image.py will stay in sync.
@@ -288,48 +284,55 @@ def ddnm_flow(x0, y, v, t, lambda_t=1, IR_mode="super resolution"):
 
 # --------- Image Processing Pipeline to create the degraded images dataset----------
 if __name__ == "__main__":
-    print(f"Using device: {device} for generating degraded images.")
-    print(f"Degradation mode: {IR_mode}")
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate a single degradation type from clean images")
+    parser.add_argument("--input_dir", default="../demo/inputs",
+                        help="Folder of clean input images")
+    parser.add_argument("--output_dir", default="../demo/degraded/superres_4x",
+                        help="Folder to save degraded output images")
+    parser.add_argument("--ir_mode", default="super resolution",
+                        choices=["super resolution", "colorization", "denoising", "deblurring"],
+                        help="Degradation type to apply")
+    _args = parser.parse_args()
+    data_folder = _args.input_dir
+    output_folder = _args.output_dir
+    _ir_mode = _args.ir_mode
+
+    print(f"Using device: {device}")
+    print(f"Degradation mode: {_ir_mode}")
     os.makedirs(output_folder, exist_ok=True)
 
-    # Extra folder for the original (pre-upsample) y only for SR mode
     original_y_folder = None
-    if IR_mode == "super resolution":
+    if _ir_mode == "super resolution":
         original_y_folder = f"{output_folder}_original_y"
         os.makedirs(original_y_folder, exist_ok=True)
 
     transform = T.ToTensor()
-    image_files = [f for f in os.listdir(data_folder) if f.lower().endswith(('jpg', 'png', 'jpeg'))]
+    image_files = [f for f in os.listdir(data_folder) if f.lower().endswith(("jpg", "png", "jpeg"))]
 
     for fname in image_files:
         path = os.path.join(data_folder, fname)
         img = Image.open(path).convert("RGB")
-        img_tensor = transform(img).unsqueeze(0).to(device)  # (1,3,H,W)
+        img_tensor = transform(img).unsqueeze(0).to(device)
 
-        A = set_operator(img_tensor.shape, IR_mode)
-        degraded = A(img_tensor)  # this is the measurement y
+        A = set_operator(img_tensor.shape, _ir_mode)
+        degraded = A(img_tensor)
 
-        # ---- ADD NOISE FOR DENOISING MODE (A = I) ----
-        if IR_mode == "denoising":
-            # sigma is assumed to be in [0,255] intensity units; convert to [0,1]
+        if _ir_mode == "denoising":
             noise_std = torch.as_tensor(sigma, dtype=img_tensor.dtype, device=img_tensor.device) / 255.0
             noise = torch.randn_like(img_tensor) * noise_std
             degraded = torch.clamp(img_tensor + noise, 0.0, 1.0)
 
-        # If super-resolution, also save the *original y* before upsampling
-        if IR_mode == "super resolution":
-            # save low-res measurement y
+        if _ir_mode == "super resolution":
             y_lr_img = TF.to_pil_image(torch.clamp(degraded.squeeze(0), 0, 1).cpu())
             y_lr_img.save(os.path.join(original_y_folder, fname))
-
-            # then upsample so FLUX can handle the size
             sr_scale_h, sr_scale_w = get_super_resolution_scales(img_tensor.shape[2], img_tensor.shape[3])
             degraded = PatchUpsampleEmbeds(degraded, sr_scale_h, sr_scale_w)
 
-        # Save the (possibly upsampled) degraded image to output_folder
-        degraded_img = TF.to_pil_image(torch.clamp(degraded.squeeze(0), 0, 1).cpu())
-        degraded_img.save(os.path.join(output_folder, fname))
+        TF.to_pil_image(torch.clamp(degraded.squeeze(0), 0, 1).cpu()).save(
+            os.path.join(output_folder, fname)
+        )
 
-    if IR_mode == "super resolution":
+    if _ir_mode == "super resolution":
         print(f"Saved {len(image_files)} LR measurements to {original_y_folder}/")
     print(f"Saved {len(image_files)} degraded images to {output_folder}/")

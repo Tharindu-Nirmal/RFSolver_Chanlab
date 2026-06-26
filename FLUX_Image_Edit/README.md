@@ -1,122 +1,125 @@
 <div align="center">
-  
-# 🖼️ Image Editing Using FLUX
+
+# FlowSteer: Conditioning Flow Field for Consistent Image Restoration
+
+[![Paper](https://img.shields.io/badge/arXiv-2512.08125-b31b1b.svg)](https://arxiv.org/abs/2512.08125)
+[![Project Page](https://img.shields.io/badge/Project-Page-blue)](https://tharindu-nirmal.github.io/FlowSteer/)
+[![CVPR 2025](https://img.shields.io/badge/CVPR-2025-green.svg)](https://cvpr.thecvf.com/)
+
+**[Tharindu Wickremasinghe](https://github.com/Tharindu-Nirmal) · Chenyang Qi · Harshana Weligampola · Zhengzhong Tu · Stanley H. Chan**
+
+Purdue University &nbsp;·&nbsp; HKUST &nbsp;·&nbsp; Texas A&M University
 
 </div>
 
+---
 
+FlowSteer is an operator-aware conditioning method that enables flow-based generative models (FLUX) to perform **zero-shot image restoration** — super-resolution, deblurring, denoising, and colorization — without retraining or task-specific adapters. The method injects a measurement prior along the sampling trajectory at each step, steering the flow toward clean images that are consistent with the degraded observation.
 
+For visual results and comparisons, see the **[project page](https://tharindu-nirmal.github.io/FlowSteer/)**.
 
-# 🛠️ Code Setup
-The environment of our code is the same as FLUX, you can refer to the [official repo](https://github.com/black-forest-labs/flux/tree/main) of FLUX, or running the following command to construct the environment.
+---
+
+## Setup
+
+### 1. Create the environment
+
+```bash
+conda create -n flowsteer python=3.10
+conda activate flowsteer
+pip install -r requirements-full.txt
+pip install -e .        # installs the local flux package
 ```
-conda create --name RF-Solver-ImageEdit python=3.10
-conda activate RF-Solver-ImageEdit
-pip install -e ".[all]"
+
+### 2. Download the FLUX.1-dev model
+
+Model weights are downloaded automatically from Hugging Face on the first run. Before running:
+
+1. Accept the [FLUX.1-dev license](https://huggingface.co/black-forest-labs/FLUX.1-dev) on Hugging Face.
+2. Log in to the Hub:
+
+```bash
+huggingface-cli login
 ```
-# 🚀 Examples for Image Editing
-We have provided several scripts to reproduce the results in the paper, mainly including 3 types of editing: Stylization, Adding, Replacing. We suggest to run the experiment on a single A100 GPU.
 
-## Stylization
-<table class="center">
-<tr>
-  <td width=10% align="center">Ref Style</td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/source/nobel.jpg" raw=true></td>
-	<td width=30% align="center"><img src="../assets/repo_figures/examples/source/art.jpg" raw=true></td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/source/cartoon.jpg" raw=true></td>
-</tr>
-<tr>
-  <td width="10%" align="center">Editing Scripts</td>
-  <td width="30%" align="center"><a href="src/run_nobel_trump.sh">Trump</a></td>
-  <td width="30%" align="center"><a href="src/run_art_mari.sh"> Marilyn Monroe</a></td>
-  <td width="30%" align="center"><a href="src/run_cartoon_ein.sh">Einstein</a></td>
-</tr>
-<tr>
-  <td width=10% align="center">Edtied image</td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/edit/nobel_Trump.jpg" raw=true></td>
-	<td width=30% align="center"><img src="../assets/repo_figures/examples/edit/art_mari.jpg" raw=true></td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/edit/cartoon_ein.jpg" raw=true></td>
-</tr>
+If you already have the weights stored locally, point to them with environment variables instead:
 
-<tr>
-  <td width="10%" align="center">Editing Scripts</td>
-  <td width="30%" align="center"><a href="src/run_nobel_biden.sh">Biden</a></td>
-  <td width="30%" align="center"><a href="src/run_art_batman.sh">Batman</a></td>
-  <td width="30%" align="center"><a href="src/run_cartoon_herry.sh">Herry Potter</a></td>
-</tr>
-<tr>
-  <td width=10% align="center">Edtied image</td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/edit/nobel_Biden.jpg" raw=true></td>
-	<td width=30% align="center"><img src="../assets/repo_figures/examples/edit/art_batman.jpg" raw=true></td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/edit/cartoon_herry.jpg" raw=true></td>
-</tr>
-</table>
-
-## Adding & Replacing
-<table class="center">
-<tr>
-  <td width=10% align="center">Source image</td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/source/hiking.jpg" raw=true></td>
-	<td width=30% align="center"><img src="../assets/repo_figures/examples/source/horse.jpg" raw=true></td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/source/boy.jpg" raw=true></td>
-</tr>
-<tr>
-  <td width="10%" align="center">Editing Scripts</td>
-  <td width="30%" align="center"><a href="src/run_hiking.sh">+ hiking stick</a></td>
-  <td width="30%" align="center"><a href="src/run_horse.sh">horse -> camel</a></td>
-  <td width="30%" align="center"><a href="src/run_boy.sh">+ dog</a></td>
-</tr>
-<tr>
-  <td width=10% align="center">Edtied image</td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/edit/hiking.jpg" raw=true></td>
-	<td width=30% align="center"><img src="../assets/repo_figures/examples/edit/horse.jpg" raw=true></td>
-  <td width=30% align="center"><img src="../assets/repo_figures/examples/edit/boy.jpg" raw=true></td>
-</tr>
-
-</table>
-
-
-# 🪄 Edit Your Own Image
-
-## Gradio Demo
-We provide the gradio demo for image editing, which is also available on our 🤗 [Huggingface Space](https://huggingface.co/spaces/wjs0725/RF-Solver-Edit)! You can also run the gradio demo on your own device using the following command: 
+```bash
+export FLUX_DEV=/path/to/flux1-dev.safetensors
+export AE=/path/to/ae.safetensors
 ```
+
+---
+
+## Quick Demo
+
+Two sample images and their pre-generated degraded versions are included in `demo/`. Run all four restoration tasks on one of them directly:
+
+```bash
 cd src
-python gradio_demo.py
+bash batch_run.sh
 ```
-Here is an example of using the gradio demo to edit an image! Note that here "Number of inject steps" means the steps of feature sharing in RF-Edit, which is highly related to the quality of edited results. We suggest tuning this parameter, and selecting the results with the best visual quality.
-<div style="text-align: center;">
-  <img src="../assets/repo_figures/Picture7.jpg" style="width:100%; display: block; margin: 0 auto;" />
-</div>
 
+Results are saved to `demo/outputs/`.
 
-## Command Line
-You can also run the following scripts to edit your own image. 
+---
+
+## Restore Your Own Image
+
+**Step 1** — generate degraded versions of your clean image.
+
+Place your image(s) in `demo/inputs/` and run:
+
+```bash
+python demo/prepare_demo.py
 ```
+
+This writes four degraded versions per image to `demo/degraded/` (super-resolution, colorization, denoising, deblurring).
+
+**Step 2** — run FlowSteer on a degraded image:
+
+```bash
 cd src
-python edit.py  --source_prompt [describe the content of your image or leave it as null] \
-                --target_prompt [describe your editing requirements] \
-                --guidance 2 \
-                --source_img_dir [the path of your source image] \
-                --num_steps 30  \
-                --inject [typically set to a number between 2 to 8] \
-                --name 'flux-dev' --offload \
-                --output_dir [output path] 
+python edit_image.py \
+    --source_prompt "A low resolution image of a cat." \
+    --target_prompt "A high resolution image of a cat. Sharp fur details, photorealistic." \
+    --degradation "super resolution" \
+    --guidance 4 \
+    --inject 5 \
+    --source_img_dir ../demo/degraded/superres_4x/your_image.jpg \
+    --output_dir ../demo/outputs/ \
+    --num_steps 30 --name flux-dev --offload
 ```
-Similarly, The ```--inject``` refers to the steps of feature sharing in RF-Edit, which is highly related to the performance of editing. 
 
+### Supported Tasks
 
+| Task | `--degradation` value |
+|------|-----------------------|
+| Super-resolution (4×) | `super resolution` |
+| Deblurring | `deblurring` |
+| Denoising | `denoising` |
+| Colorization | `colorization` |
 
-# 🖋️ Citation
+### Key Parameters
 
-If you find our work helpful, please **star 🌟** this repo and **cite 📑** our paper. Thanks for your support!
+| Parameter | Typical range | Description |
+|-----------|--------------|-------------|
+| `--inject` | 4 – 9 | FlowSteer conditioning steps — higher values enforce the measurement prior more strongly |
+| `--guidance` | 3 – 5 | Classifier-free guidance scale |
+| `--num_steps` | 25 – 30 | Total flow steps |
+| `--lambda_start` / `--lambda_step` / `--lambda_end` | 0.0 – 1.0 | Fraction of denoising steps over which the DDNM correction is active. **These should be tuned per degradation task** — the values in `batch_run.sh` provide task-specific starting points for super-resolution, colorization, denoising, and deblurring |
 
-```
-@article{wang2024taming,
-  title={Taming Rectified Flow for Inversion and Editing},
-  author={Wang, Jiangshan and Pu, Junfu and Qi, Zhongang and Guo, Jiayi and Ma, Yue and Huang, Nisha and Chen, Yuxin and Li, Xiu and Shan, Ying},
-  journal={arXiv preprint arXiv:2411.04746},
-  year={2024}
+---
+
+## Citation
+
+If you find this work helpful, please star this repo and cite our paper.
+
+```bibtex
+@article{Tharindu2025_FlowSteer,
+  title   = {FlowSteer: Conditioning Flow Field for Consistent Image Restoration},
+  author  = {Wickremasinghe, Tharindu and Qi, Chenyang and Weligampola, Harshana and Tu, Zhengzhong and Chan, Stanley H.},
+  journal = {arXiv preprint arXiv:2512.08125},
+  year    = {2025},
 }
 ```
-
